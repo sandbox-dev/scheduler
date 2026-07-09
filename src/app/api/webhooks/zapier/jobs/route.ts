@@ -42,16 +42,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  // Zapier's JSON body is a plain-text template with no conditional logic,
+  // so numeric fields are sent as quoted strings (safe even when blank,
+  // e.g. enrollment isn't always known yet) — accept a numeric string the
+  // same as a real number.
+  const toNumber = (v: unknown): number | null => {
+    if (typeof v === "number") return v;
+    if (typeof v === "string" && v.trim() !== "" && !isNaN(Number(v))) return Number(v);
+    return null;
+  };
+
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const client = typeof body.client === "string" && body.client.trim() ? body.client.trim() : name;
   const category = body.category as Category;
   const schoolType = typeof body.school_type === "string" ? body.school_type.trim() : "";
-  const enrollment = typeof body.enrollment === "number" ? body.enrollment : null;
+  const enrollment = toNumber(body.enrollment);
   const dates = Array.isArray(body.dates)
     ? body.dates.filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d))
     : [];
-  const hasSetups = typeof body.setups === "number" && body.setups >= 1;
-  const setups = hasSetups ? (body.setups as number) : 1;
+  const parsedSetups = toNumber(body.setups);
+  const hasSetups = parsedSetups !== null && parsedSetups >= 1;
+  const setups = hasSetups ? (parsedSetups as number) : 1;
   const schoolName = typeof body.school_name === "string" ? body.school_name.trim() : "";
   const schoolAddress = typeof body.school_address === "string" ? body.school_address.trim() : "";
   const roundTripMiles = typeof body.round_trip_miles === "number" ? body.round_trip_miles : 0;
