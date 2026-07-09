@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { CATEGORIES, type Category } from "@/lib/types";
+import { CATEGORIES, STUDIO_ADDRESS, type Category } from "@/lib/types";
+import { lookupDistancesToDestination } from "@/lib/googleDistance";
 
 // Receives a "booking created" event from Pixifi via a Zapier "Webhooks by
 // Zapier" action and creates a bare-bones Job + Picture Day(s) — setups,
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
   const setups = hasSetups ? (parsedSetups as number) : 1;
   const schoolName = typeof body.school_name === "string" ? body.school_name.trim() : "";
   const schoolAddress = typeof body.school_address === "string" ? body.school_address.trim() : "";
-  const roundTripMiles = typeof body.round_trip_miles === "number" ? body.round_trip_miles : 0;
+  const fallbackRoundTripMiles = toNumber(body.round_trip_miles) ?? 0;
 
   if (!name) return NextResponse.json({ error: "Missing required field: name" }, { status: 400 });
   if (!CATEGORIES.includes(category)) {
@@ -79,6 +80,25 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createServiceRoleClient();
+
+  // Auto-calculate studio-to-school round-trip mileage (for Payroll) from the
+  // school's address when we have one — same Distance Matrix lookup "Sync
+  // distances" already uses, just doubled since that helper returns one-way
+  // miles. Falls back to round_trip_miles from the payload (default 0) if
+  // there's no address or the lookup fails, so a bad address never blocks
+  // the job from being created.
+  let roundTripMiles = fallbackRoundTripMiles;
+  if (schoolAddress) {
+    try {
+      const [result] = await lookupDistancesToDestination([schoolAddress], STUDIO_ADDRESS);
+      if (result?.miles !== null && result?.miles !== undefined) {
+        roundTripMiles = +(result.miles * 2).toFixed(1);
+      }
+    } catch {
+      // Keep fallbackRoundTripMiles — a bad address or API hiccup shouldn't
+      // stop the booking from coming in; mileage can be fixed on the Jobs page.
+    }
+  }
 
   // Find an existing Job for this school with a Picture Day within a week
   // of this booking — same booking round, just another day coming in as a
