@@ -17,7 +17,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return { error: "Incorrect email or password." };
+    return { error: `DEBUG: ${error.message} (status ${error.status ?? "?"})` };
   }
 
   redirect("/overview");
