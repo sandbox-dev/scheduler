@@ -58,9 +58,17 @@ export async function POST(request: NextRequest) {
   const category = body.category as Category;
   const schoolType = typeof body.school_type === "string" ? body.school_type.trim() : "";
   const enrollment = toNumber(body.enrollment);
+  // Zapier's plain key-value Data builder doesn't reliably send a real JSON
+  // array for a bracketed key like "dates[]", so also accept a single plain
+  // "date" field — Pixifi books one Event per Picture Day, so that's all a
+  // Zap ever needs to send in practice. "dates" (a real array) still works
+  // too, e.g. for manual/API use.
+  const isDateString = (d: unknown): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d);
   const dates = Array.isArray(body.dates)
-    ? body.dates.filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d))
-    : [];
+    ? body.dates.filter(isDateString)
+    : isDateString(body.date)
+      ? [body.date]
+      : [];
   const parsedSetups = toNumber(body.setups);
   const hasSetups = parsedSetups !== null && parsedSetups >= 1;
   const setups = hasSetups ? (parsedSetups as number) : 1;
