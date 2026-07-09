@@ -10,6 +10,12 @@ import { CATEGORIES, type Category } from "@/lib/types";
 // Auth: the request must include a header `x-webhook-secret` matching
 // ZAPIER_WEBHOOK_SECRET (set that same value in the Zap's headers).
 //
+// Pixifi books one Event per Picture Day, so a 2-day school booking sends
+// two separate webhook calls. A call for a school that already has a Job
+// with a Picture Day within 7 days is treated as another day of that same
+// booking round and merged in; further out (e.g. a makeup day weeks later)
+// starts a new Job instead, since that's a separate booking round.
+//
 // Expected JSON body:
 // {
 //   "name": "Jefferson Elementary",       // required
@@ -63,14 +69,42 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceRoleClient();
 
-  // Avoid creating a duplicate if Zapier retries or re-sends the same booking.
-  const { data: existingJob } = await supabase
+  // Find an existing Job for this school with a Picture Day within a week
+  // of this booking — same booking round, just another day coming in as a
+  // separate Pixifi Event. Anything further out starts a new Job.
+  const MERGE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+  const incomingTime = new Date(dates[0]).getTime();
+  const { data: candidateJobs } = await supabase
     .from("jobs")
     .select("id, picture_days(date)")
-    .eq("name", name)
-    .maybeSingle();
-  if (existingJob && existingJob.picture_days.some((d: { date: string }) => d.date === dates[0])) {
-    return NextResponse.json({ ok: true, skipped: "duplicate", job_id: existingJob.id });
+    .eq("name", name);
+  const existingJob = (candidateJobs ?? []).find((job) =>
+    job.picture_days.some(
+      (d: { date: string }) => Math.abs(new Date(d.date).getTime() - incomingTime) <= MERGE_WINDOW_MS
+    )
+  );
+
+  if (existingJob) {
+    // Avoid creating a duplicate if Zapier retries or re-sends the same booking.
+    if (existingJob.picture_days.some((d: { date: string }) => d.date === dates[0])) {
+      return NextResponse.json({ ok: true, skipped: "duplicate", job_id: existingJob.id });
+    }
+
+    const { error: daysError } = await supabase.from("picture_days").insert(
+      dates.map((date) => ({
+        job_id: existingJob.id,
+        date,
+        setups,
+        round_trip_miles: roundTripMiles,
+        needs_review: !hasSetups,
+      }))
+    );
+
+    if (daysError) {
+      return NextResponse.json({ error: "Matched an existing job, but Picture Day failed to save" }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, job_id: existingJob.id, picture_days: dates.length, added_to_existing: true });
   }
 
   let schoolId: string | null = null;
