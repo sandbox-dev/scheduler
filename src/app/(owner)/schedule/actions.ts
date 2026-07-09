@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAvailability, getJobs, getSchools, getScheduleAssignments, getStaff, getStaffSchoolDistances } from "@/lib/data";
 import { assignEquipmentCases, buildStaffScheduleRows, fmtDate, generateSchedule, neededDatesSummary } from "@/lib/scheduling";
+import { monthLabel } from "@/lib/month";
 import { ROLES, type Role } from "@/lib/types";
 
 export async function generateAndSaveSchedule() {
@@ -154,6 +155,7 @@ export async function approveSchedule(month: string): Promise<ApproveScheduleRes
           staff_name: s.name,
           staff_email: s.email,
           month,
+          month_label: monthLabel(month),
           days: rows.map((r) => {
             const { wd, md } = fmtDate(r.date);
             return { date: `${wd} ${md}`, role: r.role, school: r.jobName, address: r.address, city: cityFromAddress(r.address) };
