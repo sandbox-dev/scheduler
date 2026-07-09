@@ -95,6 +95,14 @@ export async function setAssignmentCase(assignmentId: string, equipmentCase: str
 
 export type ApproveScheduleResult = { emailed: number; skippedNoEmail: string[]; webhookConfigured: boolean };
 
+// Addresses are stored as one free-text line (e.g. "123 Main St, Oakland, CA
+// 94602"); city is the second-to-last comma-separated segment, before the
+// state/zip. Returns "" if the address doesn't have enough parts to tell.
+function cityFromAddress(address: string): string {
+  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 2] : "";
+}
+
 // Marks the month approved and — if a Zapier webhook is configured — sends
 // one notification per staff member with assignments that month, so Zapier
 // can email them their confirmed dates. Safe to click again after edits;
@@ -148,12 +156,13 @@ export async function approveSchedule(month: string): Promise<ApproveScheduleRes
           month,
           days: rows.map((r) => {
             const { wd, md } = fmtDate(r.date);
-            return { date: `${wd} ${md}`, role: r.role, school: r.jobName, address: r.address };
+            return { date: `${wd} ${md}`, role: r.role, school: r.jobName, address: r.address, city: cityFromAddress(r.address) };
           }),
           summary: rows
             .map((r) => {
               const { wd, md } = fmtDate(r.date);
-              return `${wd} ${md} — ${r.role} at ${r.jobName}`;
+              const city = cityFromAddress(r.address);
+              return `${wd} ${md} — ${r.role} at ${r.jobName}${city ? ` (${city})` : ""}`;
             })
             .join("\n"),
         }),
