@@ -371,3 +371,185 @@ alter table picture_days add column if not exists has_trainee boolean not null d
 alter table schedule_assignments drop constraint if exists schedule_assignments_role_check;
 alter table schedule_assignments add constraint schedule_assignments_role_check
   check (role in ('Photographer', 'Assistant', 'Supervisor', 'Trainee'));
+
+-- ---------- Availability link: per-staff PIN + submit-and-lock ----------
+
+-- Random 4-digit PIN, auto-assigned to every staff member (existing rows
+-- too — the random() default backfills each one independently). Shown on
+-- the Staff page for reference; emailed to each person automatically when
+-- the owner sends an availability request.
+alter table staff add column if not exists pin text not null default lpad(floor(random() * 10000)::text, 4, '0');
+
+-- Marks a staff member's availability for a month as submitted-and-locked
+-- via the public link, so they can't go back and change it themselves
+-- (the owner can still override manually from the Availability Tracker).
+create table if not exists availability_submissions (
+  staff_id uuid not null references staff(id) on delete cascade,
+  month date not null,
+  submitted_at timestamptz not null default now(),
+  primary key (staff_id, month)
+);
+alter table availability_submissions enable row level security;
+drop policy if exists "owners full access" on availability_submissions;
+create policy "owners full access" on availability_submissions for all to authenticated using (true) with check (true);
+
+-- get_availability_form_data used to return EVERY staff member's existing
+-- availability + notes up front, relying on the client to only display the
+-- selected person's — meaning anyone with the link could see (and, via the
+-- old submit_availability RPC, edit) everyone else's data. Narrowed to just
+-- the roster (names) and the month's Picture Days; a given person's own
+-- existing answers are now only returned after they prove their PIN, via
+-- unlock_staff_availability below.
+create or replace function get_availability_form_data(p_token text)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_link availability_links%rowtype;
+  v_result json;
+begin
+  select * into v_link from availability_links where token = p_token and expires_at > now();
+  if not found then
+    return json_build_object('error', 'invalid_or_expired_link');
+  end if;
+
+  select json_build_object(
+    'month', v_link.month,
+    'staff', (
+      select coalesce(json_agg(json_build_object('id', s.id, 'name', s.name) order by s.name), '[]'::json)
+      from staff s where s.active
+    ),
+    'picture_days', (
+      select coalesce(json_agg(json_build_object(
+        'id', pd.id,
+        'date', pd.date,
+        'job_name', j.name,
+        'category', j.category
+      ) order by pd.date), '[]'::json)
+      from picture_days pd
+      join jobs j on j.id = pd.job_id
+      where date_trunc('month', pd.date) = date_trunc('month', v_link.month)
+    )
+  ) into v_result;
+
+  return v_result;
+end;
+$$;
+
+-- Verifies a staff member's PIN and, if correct, returns just their own
+-- existing selections + note for the month — or an error if the PIN is
+-- wrong or they've already submitted (locked).
+create or replace function unlock_staff_availability(p_token text, p_staff_id uuid, p_pin text)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_link availability_links%rowtype;
+  v_staff_pin text;
+  v_result json;
+begin
+  select * into v_link from availability_links where token = p_token and expires_at > now();
+  if not found then
+    return json_build_object('error', 'invalid_or_expired_link');
+  end if;
+
+  select pin into v_staff_pin from staff where id = p_staff_id and active;
+  if not found or v_staff_pin is distinct from p_pin then
+    return json_build_object('error', 'invalid_pin');
+  end if;
+
+  if exists (
+    select 1 from availability_submissions
+    where staff_id = p_staff_id and date_trunc('month', month) = date_trunc('month', v_link.month)
+  ) then
+    return json_build_object('error', 'already_submitted');
+  end if;
+
+  select json_build_object(
+    'existing', (
+      select coalesce(json_agg(a.picture_day_id), '[]'::json)
+      from availability a
+      join picture_days pd on pd.id = a.picture_day_id
+      where a.staff_id = p_staff_id and a.available
+        and date_trunc('month', pd.date) = date_trunc('month', v_link.month)
+    ),
+    'note', (
+      select coalesce(n.note, '') from availability_notes n
+      where n.staff_id = p_staff_id and date_trunc('month', n.month) = date_trunc('month', v_link.month)
+    )
+  ) into v_result;
+
+  return v_result;
+end;
+$$;
+grant execute on function unlock_staff_availability(text, uuid, text) to anon, authenticated;
+
+-- Re-validates token + PIN + not-already-submitted, then replaces this
+-- staff member's availability for the month in one shot (full-replace, not
+-- a per-day toggle) and locks it via availability_submissions.
+create or replace function submit_availability_final(
+  p_token text,
+  p_staff_id uuid,
+  p_pin text,
+  p_available_day_ids uuid[],
+  p_note text
+)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_link availability_links%rowtype;
+  v_staff_pin text;
+begin
+  select * into v_link from availability_links where token = p_token and expires_at > now();
+  if not found then
+    return json_build_object('error', 'invalid_or_expired_link');
+  end if;
+
+  select pin into v_staff_pin from staff where id = p_staff_id and active;
+  if not found or v_staff_pin is distinct from p_pin then
+    return json_build_object('error', 'invalid_pin');
+  end if;
+
+  if exists (
+    select 1 from availability_submissions
+    where staff_id = p_staff_id and date_trunc('month', month) = date_trunc('month', v_link.month)
+  ) then
+    return json_build_object('error', 'already_submitted');
+  end if;
+
+  delete from availability a
+  using picture_days pd
+  where a.picture_day_id = pd.id
+    and a.staff_id = p_staff_id
+    and date_trunc('month', pd.date) = date_trunc('month', v_link.month);
+
+  insert into availability (staff_id, picture_day_id, available, updated_at)
+  select p_staff_id, day_id, true, now()
+  from unnest(p_available_day_ids) as day_id;
+
+  insert into availability_notes (staff_id, month, note, updated_at)
+  values (p_staff_id, v_link.month, coalesce(p_note, ''), now())
+  on conflict (staff_id, month) do update set note = excluded.note, updated_at = now();
+
+  insert into availability_submissions (staff_id, month, submitted_at)
+  values (p_staff_id, v_link.month, now())
+  on conflict (staff_id, month) do nothing;
+
+  return json_build_object('ok', true);
+end;
+$$;
+grant execute on function submit_availability_final(text, uuid, text, uuid[], text) to anon, authenticated;
+
+-- Superseded by unlock_staff_availability / submit_availability_final,
+-- which check a PIN before revealing or changing anything. Revoke public
+-- access so the old no-PIN path can't be used to read or edit someone
+-- else's availability.
+revoke execute on function submit_availability(text, uuid, uuid, boolean) from anon, authenticated;
+revoke execute on function submit_availability_note(text, uuid, text) from anon, authenticated;

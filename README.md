@@ -97,11 +97,23 @@ On the Schedule page, clicking **Approve schedule** always marks that month appr
 
 This is optional — approving works fine without it, it just won't notify anyone.
 
+## Optional: email staff their availability link + PIN with one click
+
+On the Availability page, once you've generated a month's link, clicking **Send availability request** emails every active staff member individually — the shared link plus their own 4-digit PIN (shown on the Availability response tracker for reference). Each person picks their name on the link, enters their own PIN, and can only see/edit their own answers; once they submit, it locks (you can still override manually from the response tracker).
+
+1. Add each staff member's email on the Staff page.
+2. In Zapier, create a new Zap: trigger = **Webhooks by Zapier → Catch Hook**. Copy the custom webhook URL it gives you and set it as `ZAPIER_AVAILABILITY_WEBHOOK_URL`.
+3. Add an action after it — **Email by Zapier** or **Gmail → Send Email**. Send To: `staff_email`, and include `link` and `pin` in the body (e.g. "Your PIN: {{pin}}").
+4. Test by clicking **Send availability request** in the app.
+
+This is optional — the link still works fine without it, you'd just copy/paste it yourself instead of one-click emailing everyone.
+
 ## How the pieces fit together
 
 - **Jobs** — book a school job, paste in its Picture Days (date + setups per line, or leave setups off a line if unknown — it's flagged "needs review" until you confirm it). Category is just `Preschool`/`K-12` for staff matching; a separate "school type" field (TK-8, Pre-8, High School, etc.) and enrollment (number of students) are there purely for your reference. Flag a day as outdoor or "+ group photo" as needed. "Saved schools" is collapsed by default — click to expand and keep addresses/mileage current. Browse other months with the month picker at the top.
 - **Staff** — your roster: roles (Photographer/Assistant/Supervisor), which categories/specialties they're cleared for, seniority, and home city/email. "Sync distances" looks up real staff-to-school distances for ranking (see above).
-- **Availability** — click "Generate this month's link" and send that single link to staff yourself (text/email). Anyone on the link picks their own name, taps their available dates, and can leave a free-text note (scheduling preference, a hard-out time, etc.) — purely informational, shown to you in the response tracker alongside their actual dates.
+- **Availability** — click "Generate this month's link" and send that single link to staff yourself (text/email), or use "Send availability request" to email everyone individually with their own PIN in one click (see below). On the link, staff pick their name and enter their own PIN before they see anything — they can only view/edit their own answers, never anyone else's. They tap their available dates and can leave a free-text note (scheduling preference, a hard-out time, etc.) — purely informational, shown to you in the response tracker alongside their actual dates. Submitting locks it (they can't come back and change it themselves); you can still adjust it directly from the response tracker if something changes.
+- **Trainee** — check "Trainee?" on a Picture Day (Jobs page) to add one supplemental Trainee slot. Unlike the other roles, any active staff member is eligible — no separate tagging needed.
 - **Schedule** — "Generate schedule" auto-assigns every role slot by seniority → category/specialty match → distance from the job, respecting who's marked available. Any slot's dropdown shows every qualified person, available or not, grouped accordingly — so a last-minute swap is always possible even if it wasn't planned for. Unfilled slots are flagged rather than left blank.
   - **List** view for editing, **Calendar** view (Month or Week, Monday-start) to see everything at a glance — click a day to jump back to the editable list.
   - **By Staff** view shows each person's assigned dates/roles/schools for the month, with a CSV export.

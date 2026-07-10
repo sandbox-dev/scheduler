@@ -6,6 +6,7 @@ import { Card } from "@/components/ui";
 import { MonthPicker } from "@/components/MonthPicker";
 import { GenerateLinkButton } from "./GenerateLinkButton";
 import { CopyLinkBox } from "./CopyLinkBox";
+import { SendAvailabilityButton } from "./SendAvailabilityButton";
 import { AvailabilityChips } from "./AvailabilityChips";
 
 export default async function AvailabilityTrackerPage({
@@ -63,6 +64,9 @@ export default async function AvailabilityTrackerPage({
               {monthLabel(month)} availability link (valid 45 days):
             </div>
             <CopyLinkBox url={linkUrl} />
+            <div style={{ marginTop: 12 }}>
+              <SendAvailabilityButton month={month} linkUrl={linkUrl} />
+            </div>
           </>
         ) : (
           <GenerateLinkButton month={month} />
@@ -77,6 +81,7 @@ export default async function AvailabilityTrackerPage({
           <thead>
             <tr>
               <th>Staff</th>
+              <th>PIN</th>
               <th>Dates available</th>
               <th>Notes</th>
             </tr>
@@ -88,6 +93,7 @@ export default async function AvailabilityTrackerPage({
               return (
                 <tr key={s.id}>
                   <td style={{ fontWeight: 600, verticalAlign: "top" }}>{s.name}</td>
+                  <td style={{ verticalAlign: "top", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{s.pin}</td>
                   <td>
                     <div
                       style={{

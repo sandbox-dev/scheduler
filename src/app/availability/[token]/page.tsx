@@ -8,8 +8,6 @@ type FormData = {
   month: string;
   staff: { id: string; name: string }[];
   picture_days: { id: string; date: string; job_name: string; category: string }[];
-  existing: { staff_id: string; picture_day_id: string; available: boolean }[];
-  notes: { staff_id: string; note: string }[];
 };
 
 export default async function PublicAvailabilityPage({ params }: { params: Promise<{ token: string }> }) {
@@ -38,13 +36,7 @@ export default async function PublicAvailabilityPage({ params }: { params: Promi
           <div style={{ fontSize: 13.5, color: "var(--muted)" }}>No Picture Days have been booked for this month yet.</div>
         </Card>
       ) : (
-        <AvailabilityForm
-          token={token}
-          staff={result.staff}
-          pictureDays={result.picture_days}
-          existing={result.existing}
-          notes={result.notes}
-        />
+        <AvailabilityForm token={token} staff={result.staff} pictureDays={result.picture_days} />
       )}
     </div>
   );

@@ -2,28 +2,36 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-export async function submitAvailability(
-  token: string,
-  staffId: string,
-  pictureDayId: string,
-  available: boolean
-) {
+export type UnlockResult = { error?: string; existing?: string[]; note?: string };
+
+export async function unlockStaffAvailability(token: string, staffId: string, pin: string): Promise<UnlockResult> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("submit_availability", {
+  const { data, error } = await supabase.rpc("unlock_staff_availability", {
     p_token: token,
     p_staff_id: staffId,
-    p_picture_day_id: pictureDayId,
-    p_available: available,
+    p_pin: pin,
   });
-  if (error) throw new Error("Couldn't save — the link may have expired.");
+  if (error) return { error: "invalid_or_expired_link" };
+  return data as UnlockResult;
 }
 
-export async function submitAvailabilityNote(token: string, staffId: string, note: string) {
+export type SubmitResult = { error?: string; ok?: boolean };
+
+export async function submitAvailabilityFinal(
+  token: string,
+  staffId: string,
+  pin: string,
+  availableDayIds: string[],
+  note: string
+): Promise<SubmitResult> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("submit_availability_note", {
+  const { data, error } = await supabase.rpc("submit_availability_final", {
     p_token: token,
     p_staff_id: staffId,
+    p_pin: pin,
+    p_available_day_ids: availableDayIds,
     p_note: note,
   });
-  if (error) throw new Error("Couldn't save — the link may have expired.");
+  if (error) return { error: "invalid_or_expired_link" };
+  return data as SubmitResult;
 }

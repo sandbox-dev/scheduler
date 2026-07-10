@@ -82,6 +82,7 @@ export type Staff = {
   email: string;
   active: boolean;
   mileage_eligible: boolean;
+  pin: string;
 };
 
 export type Availability = {
