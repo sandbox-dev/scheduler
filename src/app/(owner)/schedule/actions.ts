@@ -7,13 +7,21 @@ import { assignEquipmentCases, buildStaffScheduleRows, fmtDate, generateSchedule
 import { monthLabel } from "@/lib/month";
 import { ROLES, type Role } from "@/lib/types";
 
-export async function generateAndSaveSchedule() {
-  const [jobs, staff, availability, staffSchoolDistances] = await Promise.all([
+// Scoped to a single month and skips locked jobs entirely — their
+// schedule_assignments are left untouched so a lock actually protects a
+// job from being wiped and reworked when regenerating the rest of a busy
+// month.
+export async function generateAndSaveSchedule(month: string) {
+  const [allJobs, staff, availability, staffSchoolDistances] = await Promise.all([
     getJobs(),
     getStaff(),
     getAvailability(),
     getStaffSchoolDistances(),
   ]);
+  const jobs = allJobs
+    .filter((j) => !j.locked)
+    .map((j) => ({ ...j, picture_days: j.picture_days.filter((d) => d.date.startsWith(month.slice(0, 7))) }))
+    .filter((j) => j.picture_days.length > 0);
   const schedule = generateSchedule(jobs, staff, availability, staffSchoolDistances);
   const equipmentCases = assignEquipmentCases(schedule);
 
@@ -66,6 +74,9 @@ export async function swapAssignment(
   staffId: string | null
 ) {
   const supabase = await createClient();
+  const { data: job } = await supabase.from("jobs").select("locked").eq("id", jobId).single();
+  if (job?.locked) throw new Error("This job is locked — unlock it on the Jobs page to make changes.");
+
   const { error } = await supabase.from("schedule_assignments").upsert(
     {
       picture_day_id: pictureDayId,
@@ -83,8 +94,11 @@ export async function swapAssignment(
   revalidatePath("/mileage");
 }
 
-export async function setAssignmentCase(assignmentId: string, equipmentCase: string) {
+export async function setAssignmentCase(assignmentId: string, jobId: string, equipmentCase: string) {
   const supabase = await createClient();
+  const { data: job } = await supabase.from("jobs").select("locked").eq("id", jobId).single();
+  if (job?.locked) throw new Error("This job is locked — unlock it on the Jobs page to make changes.");
+
   const { error } = await supabase
     .from("schedule_assignments")
     .update({ equipment_case: equipmentCase })
@@ -125,6 +139,15 @@ export async function approveSchedule(month: string): Promise<ApproveScheduleRes
     getScheduleAssignments(),
     getSchools(),
   ]);
+
+  const jobIdsThisMonth = [
+    ...new Set(
+      jobs.filter((j) => j.picture_days.some((d) => d.date.startsWith(month.slice(0, 7)))).map((j) => j.id)
+    ),
+  ];
+  if (jobIdsThisMonth.length > 0) {
+    await supabase.from("jobs").update({ locked: true }).in("id", jobIdsThisMonth);
+  }
 
   const needed = neededDatesSummary(jobs).filter((n) => n.date.startsWith(month.slice(0, 7)));
   const assignmentsByDay = new Map<string, typeof assignments>();
@@ -174,5 +197,6 @@ export async function approveSchedule(month: string): Promise<ApproveScheduleRes
   }
 
   revalidatePath("/schedule");
+  revalidatePath("/jobs");
   return { emailed, skippedNoEmail, webhookConfigured };
 }

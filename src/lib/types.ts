@@ -41,6 +41,9 @@ export type Job = {
   school_type: string;
   // Number of students — reference only, entered manually per job.
   enrollment: number | null;
+  // When true, Regenerate skips this job and its Schedule slots are
+  // read-only until unlocked. Set automatically when a month is approved.
+  locked: boolean;
 };
 
 export type PictureDay = {

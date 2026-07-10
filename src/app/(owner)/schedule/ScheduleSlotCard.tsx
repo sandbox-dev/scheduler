@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { Award, MapPin, AlertTriangle } from "lucide-react";
+import { Award, MapPin, AlertTriangle, Lock } from "lucide-react";
 import { Card } from "@/components/ui";
 import { EQUIPMENT_CASE_COUNT } from "@/lib/scheduling";
 import type { Role } from "@/lib/types";
@@ -20,6 +20,7 @@ export function ScheduleSlotCard({
   assignmentId,
   equipmentCase,
   conflictWith,
+  locked,
 }: {
   pictureDayId: string;
   jobId: string;
@@ -31,6 +32,7 @@ export function ScheduleSlotCard({
   assignmentId: string;
   equipmentCase: string;
   conflictWith?: string[];
+  locked?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -43,12 +45,21 @@ export function ScheduleSlotCard({
       style={{
         width: 190,
         padding: "10px 12px",
-        ...(hasConflict ? { border: "2px solid var(--bad)", background: "rgba(220, 38, 38, 0.06)" } : {}),
+        ...(hasConflict
+          ? { border: "2px solid var(--bad)", background: "rgba(220, 38, 38, 0.06)" }
+          : locked
+            ? { background: "var(--bg)" }
+            : {}),
       }}
     >
       {hasConflict && (
         <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--bad)", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
           <AlertTriangle size={12} /> Also on {conflictWith!.join(", ")}
+        </div>
+      )}
+      {locked && (
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--navy)", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
+          <Lock size={11} /> Locked
         </div>
       )}
       {isGroupSlot && (
@@ -79,7 +90,7 @@ export function ScheduleSlotCard({
       <select
         className="field-select"
         style={{ marginTop: 8, fontSize: 11.5, padding: "5px 7px" }}
-        disabled={pending}
+        disabled={pending || locked}
         value={assigned?.id || ""}
         onChange={(e) =>
           startTransition(() => swapAssignment(pictureDayId, jobId, role, slotIndex, e.target.value || null))
@@ -109,8 +120,9 @@ export function ScheduleSlotCard({
         <select
           className="field-select"
           style={{ marginTop: 6, fontSize: 11.5, padding: "5px 7px" }}
+          disabled={pending || locked}
           value={equipmentCase}
-          onChange={(e) => startTransition(() => setAssignmentCase(assignmentId, e.target.value))}
+          onChange={(e) => startTransition(() => setAssignmentCase(assignmentId, jobId, e.target.value))}
         >
           <option value="">Case — none</option>
           {Array.from({ length: EQUIPMENT_CASE_COUNT }, (_, i) => i + 1).map((n) => (

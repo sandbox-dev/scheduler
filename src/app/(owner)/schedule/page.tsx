@@ -87,6 +87,7 @@ export default async function SchedulePage({
   // out, but surfaced as a warning rather than silently accepted.
   const pictureDayDateById = new Map(needed.flatMap((n) => n.jobs.map((jd) => [jd.id, jd.date])));
   const pictureDayJobNameById = new Map(needed.flatMap((n) => n.jobs.map((jd) => [jd.id, jd.jobName])));
+  const lockedJobIds = new Set(jobs.filter((j) => j.locked).map((j) => j.id));
   const staffDateAssignments = new Map<string, { assignmentId: string; jobName: string; role: Role }[]>();
   assignments.forEach((a) => {
     if (!a.staff_id) return;
@@ -146,7 +147,7 @@ export default async function SchedulePage({
               <Users size={14} /> By Staff
             </Link>
           </div>
-          <GenerateButton hasSchedule={hasSchedule} />
+          <GenerateButton hasSchedule={hasSchedule} month={month} />
           <PrintButton weekStart={weekStart} />
         </div>
       </div>
@@ -346,6 +347,7 @@ export default async function SchedulePage({
                                   assignmentId={a.id}
                                   equipmentCase={a.equipment_case}
                                   conflictWith={conflictWith}
+                                  locked={lockedJobIds.has(jd.jobId)}
                                   assigned={
                                     s
                                       ? {

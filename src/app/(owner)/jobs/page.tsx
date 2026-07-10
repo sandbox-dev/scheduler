@@ -8,6 +8,7 @@ import { MonthPicker } from "@/components/MonthPicker";
 import { JobForm } from "./JobForm";
 import { DayRow } from "./DayRow";
 import { RemoveJobButton } from "./RemoveJobButton";
+import { LockJobButton } from "./LockJobButton";
 import { SchoolRow } from "./SchoolRow";
 import { SchoolTypeInput } from "./SchoolTypeInput";
 import { EnrollmentInput } from "./EnrollmentInput";
@@ -127,17 +128,27 @@ export default async function JobsPage({
       )}
 
       {jobsThisMonth.map((job) => (
-        <Card key={job.id} style={{ marginBottom: 14 }}>
+        <Card key={job.id} style={{ marginBottom: 14, ...(job.locked ? { borderTop: "3px solid var(--navy)" } : {}) }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <div className="display" style={{ fontSize: 16.5, fontWeight: 700 }}>{job.name}</div>
+              <div className="display" style={{ fontSize: 16.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+                {job.name}
+                {job.locked && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--navy)", background: "var(--bg)", padding: "2px 8px", borderRadius: 20 }}>
+                    Locked
+                  </span>
+                )}
+              </div>
               <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <CategoryBadge category={job.category} />
                 <SchoolTypeInput jobId={job.id} schoolType={job.school_type} />
                 <EnrollmentInput jobId={job.id} enrollment={job.enrollment} />
               </div>
             </div>
-            <RemoveJobButton jobId={job.id} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <LockJobButton jobId={job.id} locked={job.locked} />
+              <RemoveJobButton jobId={job.id} />
+            </div>
           </div>
           <table className="data-table" style={{ marginTop: 14 }}>
             <thead>

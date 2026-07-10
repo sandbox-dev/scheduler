@@ -99,6 +99,13 @@ export async function updateJobField(
   revalidatePath("/jobs");
 }
 
+export async function toggleJobLock(jobId: string, locked: boolean) {
+  const supabase = await createClient();
+  await supabase.from("jobs").update({ locked }).eq("id", jobId);
+  revalidatePath("/jobs");
+  revalidatePath("/schedule");
+}
+
 export async function removeJob(jobId: string) {
   const supabase = await createClient();
   await supabase.from("jobs").delete().eq("id", jobId);

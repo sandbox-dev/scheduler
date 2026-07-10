@@ -356,3 +356,9 @@ end;
 $$;
 
 grant execute on function submit_availability_note(text, uuid, text) to anon, authenticated;
+
+-- Per-job lock: when true, Regenerate skips this job entirely (its
+-- schedule_assignments are left untouched) and its Schedule slots become
+-- read-only until unlocked. Approving a month locks every job in it
+-- automatically; locking/unlocking itself never triggers staff emails.
+alter table jobs add column if not exists locked boolean not null default false;
