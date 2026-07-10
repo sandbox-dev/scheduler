@@ -39,6 +39,7 @@ import { PrintButton } from "./PrintButton";
 import { ScheduleSlotCard } from "./ScheduleSlotCard";
 import { CalendarView } from "./CalendarView";
 import { ApproveButton } from "./ApproveButton";
+import { LockJobButton } from "../jobs/LockJobButton";
 
 export default async function SchedulePage({
   searchParams,
@@ -301,17 +302,20 @@ export default async function SchedulePage({
                 const dayAssignments = assignmentsByDay.get(jd.id) || [];
                 return (
                   <div key={jd.id} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid var(--bg)" }}>
-                    <div style={{ marginBottom: 10 }}>
-                      <div className="display" style={{ fontSize: 19, fontWeight: 800 }}>{jd.jobName}</div>
-                      {jd.schoolType && (
-                        <div style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 600, marginTop: 2 }}>
-                          {jd.schoolType}
+                    <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                      <div>
+                        <div className="display" style={{ fontSize: 19, fontWeight: 800 }}>{jd.jobName}</div>
+                        {jd.schoolType && (
+                          <div style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 600, marginTop: 2 }}>
+                            {jd.schoolType}
+                          </div>
+                        )}
+                        <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                          <CategoryBadge category={jd.category} />
+                          {jd.is_outdoor && <CategoryBadge category="Outdoor" />}
                         </div>
-                      )}
-                      <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                        <CategoryBadge category={jd.category} />
-                        {jd.is_outdoor && <CategoryBadge category="Outdoor" />}
                       </div>
+                      <LockJobButton jobId={jd.jobId} locked={lockedJobIds.has(jd.jobId)} />
                     </div>
 
                     {ROLES.filter((r) => jd.crew[r] > 0).map((role) => {
