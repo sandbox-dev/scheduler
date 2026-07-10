@@ -5,8 +5,9 @@ import { lookupDistancesToDestination } from "@/lib/googleDistance";
 
 // Receives a "booking created" event from Pixifi via a Zapier "Webhooks by
 // Zapier" action and creates a bare-bones Job + Picture Day(s) — setups,
-// supervisor, indoor/outdoor, and group photo are always left for an owner
-// to confirm on the Jobs page afterward, per the studio's usual workflow.
+// supervisor, and group photo are always left for an owner to confirm on
+// the Jobs page afterward, per the studio's usual workflow. Indoor/outdoor
+// is auto-set from Pixifi's "In/Out" checkbox field when sent.
 //
 // Auth: the request must include a header `x-webhook-secret` matching
 // ZAPIER_WEBHOOK_SECRET (set that same value in the Zap's headers).
@@ -26,6 +27,7 @@ import { lookupDistancesToDestination } from "@/lib/googleDistance";
 //   "enrollment": 250,                    // optional — number of students, for reference only
 //   "dates": ["2026-09-10", "2026-09-11"],// required — at least one date (YYYY-MM-DD)
 //   "setups": 3,                          // optional — omit if unknown; flagged for review if missing
+//   "indoor_outdoor": "Outdoor",          // optional — Pixifi's In/Out checkbox text; matched for "outdoor" (case-insensitive), defaults to indoor
 //   "school_name": "Jefferson Elementary",// optional — matches/creates a saved school
 //   "school_address": "123 Main St, ...", // optional
 //   "round_trip_miles": 32                // optional, applied to every date
@@ -72,6 +74,7 @@ export async function POST(request: NextRequest) {
   const parsedSetups = toNumber(body.setups);
   const hasSetups = parsedSetups !== null && parsedSetups >= 1;
   const setups = hasSetups ? (parsedSetups as number) : 1;
+  const isOutdoor = typeof body.indoor_outdoor === "string" && /outdoor/i.test(body.indoor_outdoor);
   const schoolName = typeof body.school_name === "string" ? body.school_name.trim() : "";
   const schoolAddress = typeof body.school_address === "string" ? body.school_address.trim() : "";
   const fallbackRoundTripMiles = toNumber(body.round_trip_miles) ?? 0;
@@ -134,6 +137,7 @@ export async function POST(request: NextRequest) {
         job_id: existingJob.id,
         date,
         setups,
+        is_outdoor: isOutdoor,
         round_trip_miles: roundTripMiles,
         needs_review: !hasSetups,
       }))
@@ -181,6 +185,7 @@ export async function POST(request: NextRequest) {
       job_id: job.id,
       date,
       setups,
+      is_outdoor: isOutdoor,
       round_trip_miles: roundTripMiles,
       needs_review: !hasSetups,
     }))
