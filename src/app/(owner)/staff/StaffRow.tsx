@@ -12,7 +12,7 @@ export function StaffRow({ staff }: { staff: Staff }) {
       <td style={{ fontWeight: 700 }}>{staff.name}</td>
       <td>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-          {ROLES.map((role) => (
+          {ROLES.filter((role) => role !== "Trainee").map((role) => (
             <label key={role} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--muted)", cursor: "pointer" }}>
               <input
                 type="checkbox"

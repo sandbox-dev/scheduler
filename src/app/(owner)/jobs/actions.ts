@@ -37,6 +37,7 @@ export async function createJob(_prevState: CreateJobState, formData: FormData):
         requires_supervisor: false,
         is_outdoor: false,
         has_group_photo: false,
+        has_trainee: false,
         needs_review: setupsMissing,
       };
     })
@@ -121,6 +122,7 @@ export async function updateDay(
     | "requires_supervisor"
     | "is_outdoor"
     | "has_group_photo"
+    | "has_trainee"
     | "photographer_adjustment"
     | "assistant_adjustment"
     | "supervisor_adjustment",

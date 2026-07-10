@@ -33,7 +33,7 @@ export function AddStaffForm() {
           <div>
             <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>ROLES</div>
             <div style={{ display: "flex", gap: 12 }}>
-              {ROLES.map((r) => (
+              {ROLES.filter((r) => r !== "Trainee").map((r) => (
                 <label key={r} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, cursor: "pointer" }}>
                   <input type="checkbox" name={`role_${r}`} /> {r}
                 </label>

@@ -155,6 +155,7 @@ export default async function JobsPage({
                 <th>Needs supervisor?</th>
                 <th>Outdoor?</th>
                 <th>+ Group photo?</th>
+                <th>Trainee?</th>
               </tr>
             </thead>
             <tbody>

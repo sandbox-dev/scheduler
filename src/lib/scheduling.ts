@@ -27,6 +27,7 @@ export function crewFor(
     | "setups"
     | "requires_supervisor"
     | "has_group_photo"
+    | "has_trainee"
     | "photographer_adjustment"
     | "assistant_adjustment"
     | "supervisor_adjustment"
@@ -40,6 +41,7 @@ export function crewFor(
     Photographer: Math.max(0, basePhotographer + day.photographer_adjustment),
     Assistant: Math.max(0, baseAssistant + day.assistant_adjustment),
     Supervisor: Math.max(0, baseSupervisor + day.supervisor_adjustment),
+    Trainee: day.has_trainee ? 1 : 0,
   };
 }
 
@@ -149,7 +151,12 @@ export function neededDatesSummary(jobs: JobWithDays[]): NeededDate[] {
   return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// Every role except Trainee requires the staff member to be tagged with
+// that role. Trainee is deliberately open to any active staff member —
+// trainees are usually existing Assistants training up, not a separately
+// tagged qualification (see ROLES in types.ts).
 export function roleCandidates(staff: Staff[], role: Role) {
+  if (role === "Trainee") return staff;
   return staff.filter((s) => s.roles.includes(role));
 }
 
@@ -181,7 +188,7 @@ export function generateSchedule(
     schedule[slotKey] = {
       ...jd,
       slotKey,
-      assignments: { Photographer: [], Assistant: [], Supervisor: [] },
+      assignments: { Photographer: [], Assistant: [], Supervisor: [], Trainee: [] },
     };
 
     // Pool of candidates for a role+slot, filtered by availability, every
@@ -205,12 +212,12 @@ export function generateSchedule(
       schedule[slotKey].assignments[role][slotIndex] = chosen.id;
     };
 
-    // Fill order: Photographer, then Supervisor, then Assistant. Supervisor
-    // is the more specialized/constrained role, so it's filled before
-    // Assistant to avoid a Supervisor-qualified person getting used up on an
-    // Assistant slot when they were needed as Supervisor. This is a fill
+    // Fill order: Photographer, then Supervisor, then Assistant, then
+    // Trainee last — Trainee draws from the whole staff pool (see
+    // roleCandidates) so it's the least constrained and shouldn't use up a
+    // candidate someone else needed for a real role first. This is a fill
     // priority only — display order elsewhere still follows ROLES.
-    const FILL_ORDER: Role[] = ["Photographer", "Supervisor", "Assistant"];
+    const FILL_ORDER: Role[] = ["Photographer", "Supervisor", "Assistant", "Trainee"];
 
     FILL_ORDER.forEach((role) => {
       const needed = jd.crew[role] || 0;

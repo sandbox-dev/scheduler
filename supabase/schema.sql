@@ -362,3 +362,12 @@ grant execute on function submit_availability_note(text, uuid, text) to anon, au
 -- read-only until unlocked. Approving a month locks every job in it
 -- automatically; locking/unlocking itself never triggers staff emails.
 alter table jobs add column if not exists locked boolean not null default false;
+
+-- Trainee slot: one extra role slot per Picture Day, checked on manually.
+-- Unlike Photographer/Assistant/Supervisor, any active staff member is
+-- eligible — trainees are usually existing Assistants training up to
+-- Photographer, not a separately-tagged qualification.
+alter table picture_days add column if not exists has_trainee boolean not null default false;
+alter table schedule_assignments drop constraint if exists schedule_assignments_role_check;
+alter table schedule_assignments add constraint schedule_assignments_role_check
+  check (role in ('Photographer', 'Assistant', 'Supervisor', 'Trainee'));

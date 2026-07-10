@@ -8,6 +8,7 @@ const ROLE_COLOR: Record<string, string> = {
   Photographer: "var(--role-photographer)",
   Assistant: "var(--role-assistant)",
   Supervisor: "var(--role-supervisor)",
+  Trainee: "var(--role-trainee)",
 };
 
 export default async function PrintPage({
@@ -157,6 +158,7 @@ export default async function PrintPage({
             const photographerRows = photographerRowsFor(jd.id);
             const assistants = namesFor(jd.id, "Assistant");
             const supervisors = namesFor(jd.id, "Supervisor");
+            const trainees = namesFor(jd.id, "Trainee");
             return (
               <div
                 key={jd.id}
@@ -217,6 +219,12 @@ export default async function PrintPage({
                   <div>
                     <span style={{ color: ROLE_COLOR.Supervisor, fontWeight: 700 }}>Supervisor:</span>{" "}
                     {hasSchedule ? supervisors.join(", ") || "unfilled" : jd.crew.Supervisor}
+                  </div>
+                )}
+                {jd.crew.Trainee > 0 && (
+                  <div>
+                    <span style={{ color: ROLE_COLOR.Trainee, fontWeight: 700 }}>Trainee:</span>{" "}
+                    {hasSchedule ? trainees.join(", ") || "unfilled" : jd.crew.Trainee}
                   </div>
                 )}
               </div>

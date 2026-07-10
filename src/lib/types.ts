@@ -16,7 +16,10 @@ export type Specialty = (typeof SPECIALTIES)[number];
 export const QUALIFICATIONS = [...CATEGORIES, ...SPECIALTIES] as const;
 export type Qualification = (typeof QUALIFICATIONS)[number];
 
-export const ROLES = ["Photographer", "Assistant", "Supervisor"] as const;
+// Trainee is a supplemental 4th slot, checked on per Picture Day — unlike
+// the other three, any active staff member is eligible (see roleCandidates
+// in scheduling.ts), not just staff tagged with that role.
+export const ROLES = ["Photographer", "Assistant", "Supervisor", "Trainee"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const STUDIO_ADDRESS = "817 Arnold Dr, Martinez, CA 94553";
@@ -55,6 +58,7 @@ export type PictureDay = {
   requires_supervisor: boolean;
   is_outdoor: boolean;
   has_group_photo: boolean;
+  has_trainee: boolean;
   // True when key info (e.g. setups) wasn't known yet at booking time and
   // still needs an owner to confirm it. Cleared automatically on edit.
   needs_review: boolean;

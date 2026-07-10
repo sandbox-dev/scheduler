@@ -1,4 +1,4 @@
-import { Camera, ShieldCheck, Users } from "lucide-react";
+import { Camera, ShieldCheck, Users, GraduationCap } from "lucide-react";
 import type { Role } from "@/lib/types";
 
 export function Card({
@@ -36,8 +36,14 @@ const ROLE_COLOR: Record<Role, string> = {
   Photographer: "var(--role-photographer)",
   Assistant: "var(--role-assistant)",
   Supervisor: "var(--role-supervisor)",
+  Trainee: "var(--role-trainee)",
 };
-const ROLE_ICON: Record<Role, typeof Camera> = { Photographer: Camera, Assistant: Users, Supervisor: ShieldCheck };
+const ROLE_ICON: Record<Role, typeof Camera> = {
+  Photographer: Camera,
+  Assistant: Users,
+  Supervisor: ShieldCheck,
+  Trainee: GraduationCap,
+};
 
 export function RoleTag({ role, extra }: { role: Role; extra?: string }) {
   const Icon = ROLE_ICON[role];
