@@ -6,7 +6,7 @@ import type { ScheduleAssignment } from "@/lib/types";
 import { ROLES, type Role } from "@/lib/types";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const ROLE_LABEL: Record<Role, string> = { Photographer: "Photo", Assistant: "Asst", Supervisor: "Sup" };
+const ROLE_LABEL: Record<Role, string> = { Photographer: "Photographer", Assistant: "Assistant", Supervisor: "Supervisor" };
 const ROLE_COLOR: Record<Role, string> = {
   Photographer: "var(--role-photographer)",
   Assistant: "var(--role-assistant)",

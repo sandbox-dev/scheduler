@@ -81,6 +81,23 @@ export default async function SchedulePage({
     assignmentsByDay.set(a.picture_day_id, list);
   });
 
+  // Same-day double-booking: group every filled assignment by staff + date
+  // (regardless of role or job) so we can flag a staff member scheduled more
+  // than once on the same date — allowed temporarily while sorting things
+  // out, but surfaced as a warning rather than silently accepted.
+  const pictureDayDateById = new Map(needed.flatMap((n) => n.jobs.map((jd) => [jd.id, jd.date])));
+  const pictureDayJobNameById = new Map(needed.flatMap((n) => n.jobs.map((jd) => [jd.id, jd.jobName])));
+  const staffDateAssignments = new Map<string, { assignmentId: string; jobName: string; role: Role }[]>();
+  assignments.forEach((a) => {
+    if (!a.staff_id) return;
+    const date = pictureDayDateById.get(a.picture_day_id);
+    if (!date) return;
+    const key = `${a.staff_id}_${date}`;
+    const list = staffDateAssignments.get(key) || [];
+    list.push({ assignmentId: a.id, jobName: pictureDayJobNameById.get(a.picture_day_id) || "", role: a.role as Role });
+    staffDateAssignments.set(key, list);
+  });
+
   const pictureDayIdsThisMonth = new Set(needed.flatMap((n) => n.jobs.map((jd) => jd.id)));
   let filled = 0;
   let total = 0;
@@ -314,6 +331,10 @@ export default async function SchedulePage({
                                 required.every((q) => o.categories.includes(q))
                               );
                               const isGroupSlot = isGroupPhotoSlot(jd, role as Role, a.slot_index);
+                              const conflictEntries = s ? staffDateAssignments.get(`${s.id}_${jd.date}`) || [] : [];
+                              const conflictWith = conflictEntries
+                                .filter((e) => e.assignmentId !== a.id)
+                                .map((e) => `${e.jobName} (${e.role})`);
                               return (
                                 <ScheduleSlotCard
                                   key={a.id}
@@ -324,6 +345,7 @@ export default async function SchedulePage({
                                   isGroupSlot={isGroupSlot}
                                   assignmentId={a.id}
                                   equipmentCase={a.equipment_case}
+                                  conflictWith={conflictWith}
                                   assigned={
                                     s
                                       ? {

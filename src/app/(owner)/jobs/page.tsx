@@ -1,6 +1,7 @@
 import { AlertTriangle } from "lucide-react";
 import { getJobs, getSchools } from "@/lib/data";
 import { flattenJobDays } from "@/lib/scheduling";
+import type { JobWithDays } from "@/lib/types";
 import { getMonthsWithDates, monthLabel, pickDefaultMonth, selectableMonths } from "@/lib/month";
 import { Card, CategoryBadge } from "@/components/ui";
 import { MonthPicker } from "@/components/MonthPicker";
@@ -22,9 +23,13 @@ export default async function JobsPage({
   const monthsWithData = getMonthsWithDates(flattenJobDays(jobs).map((jd) => jd.date));
   const month = sp.month && /^\d{4}-\d{2}-01$/.test(sp.month) ? sp.month : pickDefaultMonth(monthsWithData);
 
-  const jobsThisMonth = jobs.filter((job) =>
-    job.picture_days.some((d) => d.date.startsWith(month.slice(0, 7)))
-  );
+  const jobsThisMonth = jobs
+    .filter((job) => job.picture_days.some((d) => d.date.startsWith(month.slice(0, 7))))
+    .sort((a, b) => {
+      const firstDate = (job: JobWithDays) =>
+        job.picture_days.find((d) => d.date.startsWith(month.slice(0, 7)))?.date ?? "";
+      return firstDate(a).localeCompare(firstDate(b));
+    });
 
   const daysNeedingReviewThisMonth = jobsThisMonth.reduce(
     (count, job) =>

@@ -191,7 +191,7 @@ export default async function PrintPage({
                   {[jd.is_outdoor && "Outdoor", jd.has_group_photo && "+ Group photo"].filter(Boolean).join(", ")}
                 </div>
                 <div style={{ marginTop: 4 }}>
-                  <span style={{ color: ROLE_COLOR.Photographer, fontWeight: 700 }}>Photo:</span>
+                  <span style={{ color: ROLE_COLOR.Photographer, fontWeight: 700 }}>Photographer:</span>
                   {hasSchedule ? (
                     photographerRows.length > 0 ? (
                       photographerRows.map((r, i) => (
@@ -209,13 +209,13 @@ export default async function PrintPage({
                 </div>
                 {jd.crew.Assistant > 0 && (
                   <div>
-                    <span style={{ color: ROLE_COLOR.Assistant, fontWeight: 700 }}>Asst:</span>{" "}
+                    <span style={{ color: ROLE_COLOR.Assistant, fontWeight: 700 }}>Assistant:</span>{" "}
                     {hasSchedule ? assistants.join(", ") || "unfilled" : jd.crew.Assistant}
                   </div>
                 )}
                 {jd.crew.Supervisor > 0 && (
                   <div>
-                    <span style={{ color: ROLE_COLOR.Supervisor, fontWeight: 700 }}>Sup:</span>{" "}
+                    <span style={{ color: ROLE_COLOR.Supervisor, fontWeight: 700 }}>Supervisor:</span>{" "}
                     {hasSchedule ? supervisors.join(", ") || "unfilled" : jd.crew.Supervisor}
                   </div>
                 )}

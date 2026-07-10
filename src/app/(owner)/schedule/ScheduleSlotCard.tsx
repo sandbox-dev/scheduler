@@ -19,6 +19,7 @@ export function ScheduleSlotCard({
   isGroupSlot,
   assignmentId,
   equipmentCase,
+  conflictWith,
 }: {
   pictureDayId: string;
   jobId: string;
@@ -29,14 +30,27 @@ export function ScheduleSlotCard({
   isGroupSlot?: boolean;
   assignmentId: string;
   equipmentCase: string;
+  conflictWith?: string[];
 }) {
   const [pending, startTransition] = useTransition();
 
   const available = options.filter((o) => o.available);
   const unavailable = options.filter((o) => !o.available);
+  const hasConflict = !!assigned && !!conflictWith && conflictWith.length > 0;
 
   return (
-    <Card style={{ width: 190, padding: "10px 12px" }}>
+    <Card
+      style={{
+        width: 190,
+        padding: "10px 12px",
+        ...(hasConflict ? { border: "2px solid var(--bad)", background: "rgba(220, 38, 38, 0.06)" } : {}),
+      }}
+    >
+      {hasConflict && (
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--bad)", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
+          <AlertTriangle size={12} /> Also on {conflictWith!.join(", ")}
+        </div>
+      )}
       {isGroupSlot && (
         <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--rose)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.03em" }}>
           Group photo
