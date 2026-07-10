@@ -31,6 +31,8 @@ export default async function StaffPage() {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
               <th>Roles</th>
               <th>Categories</th>
               <th>Home city</th>

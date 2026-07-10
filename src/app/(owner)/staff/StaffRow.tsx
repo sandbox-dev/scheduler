@@ -11,6 +11,26 @@ export function StaffRow({ staff }: { staff: Staff }) {
     <tr style={{ opacity: staff.active ? 1 : 0.5 }}>
       <td style={{ fontWeight: 700 }}>{staff.name}</td>
       <td>
+        <input
+          type="email"
+          className="field-input"
+          style={{ width: 170 }}
+          placeholder="email@example.com"
+          defaultValue={staff.email}
+          onBlur={(e) => startTransition(() => updateStaffField(staff.id, "email", e.target.value.trim()))}
+        />
+      </td>
+      <td>
+        <input
+          type="tel"
+          className="field-input"
+          style={{ width: 130 }}
+          placeholder="(555) 555-5555"
+          defaultValue={staff.phone}
+          onBlur={(e) => startTransition(() => updateStaffField(staff.id, "phone", e.target.value.trim()))}
+        />
+      </td>
+      <td>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           {ROLES.filter((role) => role !== "Trainee").map((role) => (
             <label key={role} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--muted)", cursor: "pointer" }}>
