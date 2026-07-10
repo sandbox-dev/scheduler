@@ -8,7 +8,6 @@ import { MonthPicker } from "@/components/MonthPicker";
 import { JobForm } from "./JobForm";
 import { DayRow } from "./DayRow";
 import { RemoveJobButton } from "./RemoveJobButton";
-import { LockJobButton } from "./LockJobButton";
 import { SchoolRow } from "./SchoolRow";
 import { SchoolTypeInput } from "./SchoolTypeInput";
 import { EnrollmentInput } from "./EnrollmentInput";
@@ -145,10 +144,7 @@ export default async function JobsPage({
                 <EnrollmentInput jobId={job.id} enrollment={job.enrollment} />
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <LockJobButton jobId={job.id} locked={job.locked} />
-              <RemoveJobButton jobId={job.id} />
-            </div>
+            <RemoveJobButton jobId={job.id} />
           </div>
           <table className="data-table" style={{ marginTop: 14 }}>
             <thead>
