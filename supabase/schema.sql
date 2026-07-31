@@ -583,3 +583,8 @@ alter table availability_links add column if not exists deadline_at timestamptz;
 -- so the hourly cron job never re-sends it. Cleared back to null if the
 -- owner re-sends the request with a new deadline.
 alter table availability_links add column if not exists reminder_sent_at timestamptz;
+
+-- Set once the deadline itself has passed and the cron job has checked
+-- whether anyone's still missing (and notified the studio if so). Cleared
+-- back to null alongside reminder_sent_at on a re-send with a new deadline.
+alter table availability_links add column if not exists deadline_notice_sent_at timestamptz;

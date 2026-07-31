@@ -54,12 +54,13 @@ export async function sendAvailabilityRequests(
 ): Promise<SendAvailabilityRequestsResult> {
   const token = linkUrl.split("/").pop()!;
   const supabase = await createClient();
-  // Clearing reminder_sent_at handles a re-send with a pushed-out deadline —
-  // otherwise the old deadline's reminder having already fired would
-  // silently block a reminder for the new one.
+  // Clearing reminder_sent_at / deadline_notice_sent_at handles a re-send
+  // with a pushed-out deadline — otherwise the old deadline's reminder or
+  // studio notice having already fired would silently block one for the new
+  // deadline.
   await supabase
     .from("availability_links")
-    .update({ deadline_at: deadlineAt, reminder_sent_at: null })
+    .update({ deadline_at: deadlineAt, reminder_sent_at: null, deadline_notice_sent_at: null })
     .eq("token", token);
   revalidatePath("/availability-tracker");
 

@@ -123,20 +123,30 @@ Both are optional independently — leave either env var unset to skip that noti
 
 ## Optional: 24-hour reminder for staff who haven't responded
 
-When you click **Send availability request**, you now also set a "Respond by" date/time. If someone hasn't submitted by 24 hours before that deadline, this reminds them automatically — one email, once, per person, per month.
+When you click **Send availability request**, you now also set a "Respond by" date/time. If someone hasn't submitted by about 24 hours before that deadline, this reminds them automatically — one email, once, per person, per month.
 
 This one needs two things instead of just a Zap, since it runs on a schedule rather than off a button click:
 
 1. **A cron secret** — generate a random value and set it as `CRON_SECRET`.
-2. **Vercel Cron** — this repo's `vercel.json` already defines an hourly cron hitting `/api/cron/availability-reminders`. After deploying, open your project in the Vercel dashboard → **Settings → Cron Jobs** and confirm it's enabled (Vercel picks it up from `vercel.json` automatically on deploy, but double-check it shows up and is turned on).
-3. **The Zap** — same pattern as "Send availability request" above: trigger = **Webhooks by Zapier → Catch Hook**, set its URL as `ZAPIER_AVAILABILITY_REMINDER_WEBHOOK_URL`, then an **Email by Zapier**/**Gmail** action to `staff_email` using `link`, `pin`, and `deadline_label` in the body.
+2. **Vercel Cron** — this repo's `vercel.json` already defines a daily cron hitting `/api/cron/availability-reminders` (Vercel's free Hobby plan only allows once-a-day schedules, not hourly). After deploying, open your project in the Vercel dashboard → **Settings → Cron Jobs** and confirm it shows up and is turned on.
+3. **The Zap** — same pattern as "Send availability request" above: trigger = **Webhooks by Zapier → Catch Hook**, set its URL as `ZAPIER_AVAILABILITY_REMINDER_WEBHOOK_URL`, then an **Email by Zapier**/**Gmail** action to `staff_email` using `link`, `pin`, and `deadline_label` in the body. Add `hello@sandboxphotographers.com` as a **CC** on this action so the studio sees every reminder that goes out.
 4. Test without waiting a full day: set a test link's deadline to ~12 hours out, then hit the route directly —
    ```bash
    curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://your-deployed-domain.com/api/cron/availability-reminders
    ```
-   It responds with how many links it looked at and how many reminders it sent.
+   It responds with how many links it looked at and how many reminders/notices it sent.
 
 This is optional — without `CRON_SECRET` set, the route just returns 401 and nothing fires.
+
+## Optional: notify the studio if anyone missed the deadline
+
+Same cron job as above, run once more when a deadline actually passes: if any active staff member still hasn't submitted, this emails the studio a list of who's missing. Stays silent if everyone got their availability in by the deadline (no separate "all clear" email — you'd already know from the "everyone's submitted" notification above).
+
+1. In Zapier, create a Zap: trigger = **Webhooks by Zapier → Catch Hook**. Set its URL as `ZAPIER_DEADLINE_MISSED_WEBHOOK_URL`.
+2. Add an action — **Email by Zapier**/**Gmail** — to `hello@sandboxphotographers.com`. Use `month_label`, `deadline_label`, and `missing_names` (a comma-separated list) or `missing_count` in the body.
+3. Test the same way as the reminder job above — hit `/api/cron/availability-reminders` with `CRON_SECRET` against a test link whose deadline is already in the past.
+
+This is optional — leave `ZAPIER_DEADLINE_MISSED_WEBHOOK_URL` unset to skip it.
 
 ## How the pieces fit together
 
