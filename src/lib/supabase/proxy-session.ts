@@ -1,10 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// /api/webhooks is intentionally public here — those routes authenticate
-// themselves via a shared secret, since external services like Zapier have
-// no logged-in session for this middleware to check.
-const PUBLIC_PATHS = ["/login", "/availability", "/auth", "/api/webhooks"];
+// /api/webhooks and /api/cron are intentionally public here — those routes
+// authenticate themselves via a shared secret (ZAPIER_WEBHOOK_SECRET /
+// CRON_SECRET), since external triggers like Zapier and Vercel Cron have no
+// logged-in session for this middleware to check.
+const PUBLIC_PATHS = ["/login", "/availability", "/auth", "/api/webhooks", "/api/cron"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
