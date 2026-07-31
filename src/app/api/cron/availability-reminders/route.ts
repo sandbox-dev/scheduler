@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { monthLabel } from "@/lib/month";
 
-// Runs on Vercel Cron (see vercel.json, hourly) to remind any active staff
+// Runs on Vercel Cron (see vercel.json, once daily — Vercel's free Hobby
+// plan doesn't allow finer-grained schedules) to remind any active staff
 // member who hasn't submitted availability yet, once their month's deadline
-// is within 24 hours. No logged-in session exists for a cron trigger, so
+// is within about a day. No logged-in session exists for a cron trigger, so
 // this uses the service-role client the same way the Zapier import webhook
 // does (src/app/api/webhooks/zapier/jobs/route.ts).
 //
@@ -21,18 +22,21 @@ export async function GET(request: NextRequest) {
   const webhookUrl = process.env.ZAPIER_AVAILABILITY_REMINDER_WEBHOOK_URL;
 
   const now = new Date();
-  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  // A bit wider than a strict 24h, since this only ticks once a day — the
+  // buffer guarantees every deadline gets caught by exactly one run even if
+  // that run lands a little later than the previous one did.
+  const lookahead = new Date(now.getTime() + 26 * 60 * 60 * 1000);
 
-  // Deadlines that will land within the next 24 hours and haven't already
-  // had their reminder batch sent. Hourly cron granularity means this fires
-  // on whichever tick first sees the deadline enter that window, not at a
-  // precise T-minus-24h instant.
+  // Deadlines that will land within roughly the next day and haven't
+  // already had their reminder batch sent. Daily cron granularity means
+  // this fires on whichever tick first sees the deadline enter that
+  // window, not at a precise T-minus-24h instant.
   const { data: links, error: linksError } = await supabase
     .from("availability_links")
     .select("token, month, deadline_at")
     .not("deadline_at", "is", null)
     .gt("deadline_at", now.toISOString())
-    .lte("deadline_at", in24h.toISOString())
+    .lte("deadline_at", lookahead.toISOString())
     .is("reminder_sent_at", null);
 
   if (linksError) {
