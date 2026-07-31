@@ -1,7 +1,7 @@
 import { getStaff } from "@/lib/data";
 import { Card } from "@/components/ui";
 import { AddStaffForm } from "./AddStaffForm";
-import { StaffRow } from "./StaffRow";
+import { StaffTable } from "./StaffTable";
 import { SyncDistancesButton } from "./SyncDistancesButton";
 
 export default async function StaffPage() {
@@ -27,25 +27,7 @@ export default async function StaffPage() {
       </Card>
 
       <Card>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>Roles</th>
-              <th>Categories</th>
-              <th>Home city</th>
-              <th>Seniority</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {staff.map((s) => (
-              <StaffRow key={s.id} staff={s} />
-            ))}
-          </tbody>
-        </table>
+        <StaffTable staff={staff} />
       </Card>
     </div>
   );

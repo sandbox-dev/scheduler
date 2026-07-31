@@ -86,13 +86,18 @@ export async function getApprovalForMonth(month: string): Promise<ScheduleApprov
   return data as ScheduleApproval | null;
 }
 
-export type AvailabilityLink = { token: string; month: string; expires_at: string };
+export type AvailabilityLink = {
+  token: string;
+  month: string;
+  expires_at: string;
+  deadline_at: string | null;
+};
 
 export async function getActiveAvailabilityLinkForMonth(month: string): Promise<AvailabilityLink | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("availability_links")
-    .select("token, month, expires_at")
+    .select("token, month, expires_at, deadline_at")
     .eq("month", month)
     .gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false })

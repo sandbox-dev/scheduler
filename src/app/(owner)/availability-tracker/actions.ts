@@ -44,14 +44,35 @@ export type SendAvailabilityRequestsResult = { sent: number; skippedNoEmail: str
 // One click instead of texting/emailing everyone individually — fires one
 // notification per active staff member (via a Zapier webhook, same pattern
 // as the schedule-approval emails) with the shared link plus their own PIN,
-// so each person only ever needs their own PIN, not the group's.
-export async function sendAvailabilityRequests(month: string, linkUrl: string): Promise<SendAvailabilityRequestsResult> {
+// so each person only ever needs their own PIN, not the group's. Also
+// records the "respond by" deadline the owner just set on the link, which
+// the 24h-before reminder cron job reads to know when to nudge stragglers.
+export async function sendAvailabilityRequests(
+  month: string,
+  linkUrl: string,
+  deadlineAt: string
+): Promise<SendAvailabilityRequestsResult> {
+  const token = linkUrl.split("/").pop()!;
+  const supabase = await createClient();
+  // Clearing reminder_sent_at handles a re-send with a pushed-out deadline —
+  // otherwise the old deadline's reminder having already fired would
+  // silently block a reminder for the new one.
+  await supabase
+    .from("availability_links")
+    .update({ deadline_at: deadlineAt, reminder_sent_at: null })
+    .eq("token", token);
+  revalidatePath("/availability-tracker");
+
   const webhookUrl = process.env.ZAPIER_AVAILABILITY_WEBHOOK_URL;
   const webhookConfigured = !!webhookUrl;
 
   const staff = await getStaff();
   const skippedNoEmail: string[] = [];
   let sent = 0;
+  const deadlineLabel = new Date(deadlineAt).toLocaleString(undefined, {
+    dateStyle: "long",
+    timeStyle: "short",
+  });
 
   if (webhookConfigured) {
     for (const s of staff) {
@@ -70,6 +91,8 @@ export async function sendAvailabilityRequests(month: string, linkUrl: string): 
           month_label: monthLabel(month),
           link: linkUrl,
           pin: s.pin,
+          deadline: deadlineAt,
+          deadline_label: deadlineLabel,
         }),
       });
       sent++;

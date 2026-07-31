@@ -4,22 +4,50 @@ import { useState, useTransition } from "react";
 import { Mail } from "lucide-react";
 import { sendAvailabilityRequests } from "./actions";
 
-export function SendAvailabilityButton({ month, linkUrl }: { month: string; linkUrl: string }) {
+// datetime-local inputs need "yyyy-MM-ddTHH:mm" in the viewer's local time,
+// not the ISO/UTC string stored on the link.
+function toLocalInputValue(isoString: string) {
+  const d = new Date(isoString);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function SendAvailabilityButton({
+  month,
+  linkUrl,
+  initialDeadline,
+}: {
+  month: string;
+  linkUrl: string;
+  initialDeadline?: string | null;
+}) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deadline, setDeadline] = useState(initialDeadline ? toLocalInputValue(initialDeadline) : "");
 
   return (
     <div>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>
+        Respond by
+        <input
+          type="datetime-local"
+          className="field-input"
+          style={{ display: "block", marginTop: 4, width: 220 }}
+          value={deadline}
+          onChange={(e) => setDeadline(e.target.value)}
+        />
+      </label>
       <button
         className="btn-secondary"
-        disabled={pending}
+        disabled={pending || !deadline}
         onClick={() => {
           setError(null);
           setMessage(null);
           startTransition(async () => {
             try {
-              const result = await sendAvailabilityRequests(month, linkUrl);
+              const deadlineAt = new Date(deadline).toISOString();
+              const result = await sendAvailabilityRequests(month, linkUrl, deadlineAt);
               if (!result.webhookConfigured) {
                 setMessage("No notification webhook configured yet — see README to set one up.");
               } else {

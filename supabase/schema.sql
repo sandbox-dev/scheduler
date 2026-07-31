@@ -506,13 +506,16 @@ as $$
 declare
   v_link availability_links%rowtype;
   v_staff_pin text;
+  v_staff_name text;
+  v_active_count integer;
+  v_submitted_count integer;
 begin
   select * into v_link from availability_links where token = p_token and expires_at > now();
   if not found then
     return json_build_object('error', 'invalid_or_expired_link');
   end if;
 
-  select pin into v_staff_pin from staff where id = p_staff_id and active;
+  select pin, name into v_staff_pin, v_staff_name from staff where id = p_staff_id and active;
   if not found or v_staff_pin is distinct from p_pin then
     return json_build_object('error', 'invalid_pin');
   end if;
@@ -542,7 +545,22 @@ begin
   values (p_staff_id, v_link.month, now())
   on conflict (staff_id, month) do nothing;
 
-  return json_build_object('ok', true);
+  -- Lets the caller fire "everyone's in" owner notification without a
+  -- second round trip. Safe to compute unconditionally here — since a
+  -- submission can never be undone, this can only flip to true once per
+  -- month, on whichever submission happens to be the last one in.
+  select count(*) into v_active_count from staff where active;
+  select count(*) into v_submitted_count
+    from availability_submissions asub
+    join staff s on s.id = asub.staff_id and s.active
+    where date_trunc('month', asub.month) = date_trunc('month', v_link.month);
+
+  return json_build_object(
+    'ok', true,
+    'staff_name', v_staff_name,
+    'month', v_link.month,
+    'all_submitted', v_active_count > 0 and v_submitted_count >= v_active_count
+  );
 end;
 $$;
 grant execute on function submit_availability_final(text, uuid, text, uuid[], text) to anon, authenticated;
@@ -553,3 +571,15 @@ grant execute on function submit_availability_final(text, uuid, text, uuid[], te
 -- else's availability.
 revoke execute on function submit_availability(text, uuid, uuid, boolean) from anon, authenticated;
 revoke execute on function submit_availability_note(text, uuid, text) from anon, authenticated;
+
+-- ---------- Owner notifications + 24h-before-deadline reminder ----------
+
+-- "Respond by" deadline for a month's availability window, set by the owner
+-- when sending the request (see sendAvailabilityRequests). Drives the 24h-
+-- before reminder cron job (src/app/api/cron/availability-reminders).
+alter table availability_links add column if not exists deadline_at timestamptz;
+
+-- Set once the 24h-before-deadline reminder batch has fired for this link,
+-- so the hourly cron job never re-sends it. Cleared back to null if the
+-- owner re-sends the request with a new deadline.
+alter table availability_links add column if not exists reminder_sent_at timestamptz;

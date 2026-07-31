@@ -108,11 +108,41 @@ On the Availability page, once you've generated a month's link, clicking **Send 
 
 This is optional — the link still works fine without it, you'd just copy/paste it yourself instead of one-click emailing everyone.
 
+## Optional: notify the studio when staff respond
+
+Two more Zaps, both fired from the staff-facing availability link (not the owner Availability page):
+
+1. **One staff member submitted** — fires every time anyone submits.
+2. **Everyone's submitted** — fires once, the moment every active staff member has responded for that month.
+
+1. In Zapier, create a Zap for each: trigger = **Webhooks by Zapier → Catch Hook**. Set the webhook URLs as `ZAPIER_STAFF_SUBMITTED_WEBHOOK_URL` and `ZAPIER_ALL_SUBMITTED_WEBHOOK_URL`.
+2. Add an action after each — **Email by Zapier** or **Gmail → Send Email** — to `hello@sandboxphotographers.com`. Use `staff_name` / `month_label` in the first, and just `month_label` in the second.
+3. Test by submitting availability as a staff member through the public link.
+
+Both are optional independently — leave either env var unset to skip that notification.
+
+## Optional: 24-hour reminder for staff who haven't responded
+
+When you click **Send availability request**, you now also set a "Respond by" date/time. If someone hasn't submitted by 24 hours before that deadline, this reminds them automatically — one email, once, per person, per month.
+
+This one needs two things instead of just a Zap, since it runs on a schedule rather than off a button click:
+
+1. **A cron secret** — generate a random value and set it as `CRON_SECRET`.
+2. **Vercel Cron** — this repo's `vercel.json` already defines an hourly cron hitting `/api/cron/availability-reminders`. After deploying, open your project in the Vercel dashboard → **Settings → Cron Jobs** and confirm it's enabled (Vercel picks it up from `vercel.json` automatically on deploy, but double-check it shows up and is turned on).
+3. **The Zap** — same pattern as "Send availability request" above: trigger = **Webhooks by Zapier → Catch Hook**, set its URL as `ZAPIER_AVAILABILITY_REMINDER_WEBHOOK_URL`, then an **Email by Zapier**/**Gmail** action to `staff_email` using `link`, `pin`, and `deadline_label` in the body.
+4. Test without waiting a full day: set a test link's deadline to ~12 hours out, then hit the route directly —
+   ```bash
+   curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://your-deployed-domain.com/api/cron/availability-reminders
+   ```
+   It responds with how many links it looked at and how many reminders it sent.
+
+This is optional — without `CRON_SECRET` set, the route just returns 401 and nothing fires.
+
 ## How the pieces fit together
 
 - **Jobs** — book a school job, paste in its Picture Days (date + setups per line, or leave setups off a line if unknown — it's flagged "needs review" until you confirm it). Category is just `Preschool`/`K-12` for staff matching; a separate "school type" field (TK-8, Pre-8, High School, etc.) and enrollment (number of students) are there purely for your reference. Flag a day as outdoor or "+ group photo" as needed. "Saved schools" is collapsed by default — click to expand and keep addresses/mileage current. Browse other months with the month picker at the top.
-- **Staff** — your roster: roles (Photographer/Assistant/Supervisor), which categories/specialties they're cleared for, seniority, and home city/email. "Sync distances" looks up real staff-to-school distances for ranking (see above).
-- **Availability** — click "Generate this month's link" and send that single link to staff yourself (text/email), or use "Send availability request" to email everyone individually with their own PIN in one click (see below). On the link, staff pick their name and enter their own PIN before they see anything — they can only view/edit their own answers, never anyone else's. They tap their available dates and can leave a free-text note (scheduling preference, a hard-out time, etc.) — purely informational, shown to you in the response tracker alongside their actual dates. Submitting locks it (they can't come back and change it themselves); you can still adjust it directly from the response tracker if something changes.
+- **Staff** — your roster: roles (Photographer/Assistant/Supervisor), which categories/specialties they're cleared for, seniority, and home city/email. "Sync distances" looks up real staff-to-school distances for ranking (see above). Deactivated staff (e.g. someone who's left) are hidden from the roster by default — use "Show inactive" above the table to bring them back into view or reactivate them.
+- **Availability** — click "Generate this month's link" and send that single link to staff yourself (text/email), or use "Send availability request" to email everyone individually with their own PIN in one click, after setting a "Respond by" deadline (see below). On the link, staff pick their name and enter their own PIN before they see anything — they can only view/edit their own answers, never anyone else's. They tap their available dates and can leave a free-text note (scheduling preference, a hard-out time, etc.) — purely informational, shown to you in the response tracker alongside their actual dates. Submitting locks it (they can't come back and change it themselves); you can still adjust it directly from the response tracker if something changes.
 - **Trainee** — check "Trainee?" on a Picture Day (Jobs page) to add one supplemental Trainee slot. Unlike the other roles, any active staff member is eligible — no separate tagging needed.
 - **Schedule** — "Generate schedule" auto-assigns every role slot by seniority → category/specialty match → distance from the job, respecting who's marked available. Any slot's dropdown shows every qualified person, available or not, grouped accordingly — so a last-minute swap is always possible even if it wasn't planned for. Unfilled slots are flagged rather than left blank.
   - **List** view for editing, **Calendar** view (Month or Week, Monday-start) to see everything at a glance — click a day to jump back to the editable list.

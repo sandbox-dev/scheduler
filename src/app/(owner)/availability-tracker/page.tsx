@@ -64,8 +64,16 @@ export default async function AvailabilityTrackerPage({
               {monthLabel(month)} availability link (valid 45 days):
             </div>
             <CopyLinkBox url={linkUrl} />
+            {link?.deadline_at && (
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
+                Current deadline:{" "}
+                <strong>
+                  {new Date(link.deadline_at).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" })}
+                </strong>
+              </div>
+            )}
             <div style={{ marginTop: 12 }}>
-              <SendAvailabilityButton month={month} linkUrl={linkUrl} />
+              <SendAvailabilityButton month={month} linkUrl={linkUrl} initialDeadline={link?.deadline_at} />
             </div>
           </>
         ) : (
