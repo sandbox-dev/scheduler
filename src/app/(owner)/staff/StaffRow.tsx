@@ -73,10 +73,10 @@ export function StaffRow({ staff }: { staff: Staff }) {
     <tr style={{ opacity: staff.active ? 1 : 0.5 }}>
       <td style={{ fontWeight: 700 }}>{staff.name}</td>
       <td>
-        <SavableField staffId={staff.id} field="email" defaultValue={staff.email} type="email" placeholder="email@example.com" width={170} />
-      </td>
-      <td>
-        <SavableField staffId={staff.id} field="phone" defaultValue={staff.phone} type="tel" placeholder="(555) 555-5555" width={130} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <SavableField staffId={staff.id} field="email" defaultValue={staff.email} type="email" placeholder="email@example.com" width={170} />
+          <SavableField staffId={staff.id} field="phone" defaultValue={staff.phone} type="tel" placeholder="(555) 555-5555" width={170} />
+        </div>
       </td>
       <td>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>

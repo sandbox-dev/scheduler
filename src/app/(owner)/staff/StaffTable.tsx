@@ -27,8 +27,7 @@ export function StaffTable({ staff }: { staff: Staff[] }) {
           <thead>
             <tr>
               <th>Name</th>
-              <th>Email</th>
-              <th>Phone</th>
+              <th>Contact</th>
               <th>Roles</th>
               <th>Categories</th>
               <th>Home city</th>
