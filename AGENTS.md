@@ -80,8 +80,6 @@ Built strictly from who was *actually assigned* to work a Picture Day (`schedule
 ## 12. What's still deferred / manual (check with Adi before assuming stale)
 
 - **No invite/password-reset acceptance page** — creating a new staff login has to go through Supabase dashboard's "Create new user" (setting the password directly there and telling the person out of band), not "Send invitation" — the app has no route that handles a Supabase invite/recovery token yet.
-- **Save-on-blur for Staff email/phone** — no explicit Save button; edits commit on blur. Adi wants an explicit Save at least for those two fields, to avoid accidental changes. Not started; scope (just those fields vs. app-wide) undecided.
 - **Zapier email signatures** need fixing on the approval/availability-request emails — not urgent, exact issue not yet described.
-- **Weekly printable header not updating between weeks** — reported once, not reproduced in testing. If this comes up again, get the exact navigation steps (new tab per Print click vs. prev/next within one tab) before assuming it's fixed or gone.
 - **Staff roles have no permission tiers** — any Supabase Auth login is full owner access; accepted as fine for the one additional staff login (Steph) that exists today, but worth remembering if a future login should have been more limited.
 - **Adi's stated future interest, not started**: eventually building a custom CRM to replace Pixifi entirely (contracts, invoicing, e-signatures, lead intake, calendar/email sync beyond just booking). If picked up, recommended approach is to absorb specific pain-point modules into this app incrementally rather than a full rebuild, keeping Pixifi/a payments processor for the hard-to-replicate parts (payments, e-signature/compliance).
