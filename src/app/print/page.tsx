@@ -190,7 +190,9 @@ export default async function PrintPage({
                   {jd.enrollment ? ` · ${jd.enrollment} students` : ""}
                 </div>
                 <div style={{ color: "var(--muted)" }}>
-                  {[jd.is_outdoor && "Outdoor", jd.has_group_photo && "+ Group photo"].filter(Boolean).join(", ")}
+                  {[jd.is_outdoor && "Outdoor", jd.has_group_photo && "+ Group photo", jd.is_babies && "Babies"]
+                    .filter(Boolean)
+                    .join(", ")}
                 </div>
                 <div style={{ marginTop: 4 }}>
                   <span style={{ color: ROLE_COLOR.Photographer, fontWeight: 700 }}>Photographer:</span>

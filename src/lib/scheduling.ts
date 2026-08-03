@@ -58,15 +58,17 @@ export function isGroupPhotoSlot(
 
 // Qualifications a candidate must ALL hold for a given role+slot: the job's
 // school-type category always applies; Outdoor Photography applies to
-// Photographer slots on outdoor-flagged days; Group Photography applies only
+// Photographer slots on outdoor-flagged days; Babies Photography applies to
+// Photographer slots on babies-flagged days; Group Photography applies only
 // to the one dedicated group-photo slot.
 export function requiredQualificationsFor(
-  jd: Pick<PictureDay, "setups" | "is_outdoor" | "has_group_photo"> & { category: string },
+  jd: Pick<PictureDay, "setups" | "is_outdoor" | "is_babies" | "has_group_photo"> & { category: string },
   role: Role,
   slotIndex: number
 ): Qualification[] {
   const required: Qualification[] = [jd.category as Qualification];
   if (role === "Photographer" && jd.is_outdoor) required.push("Outdoor Photography");
+  if (role === "Photographer" && jd.is_babies) required.push("Babies Photography");
   if (isGroupPhotoSlot(jd, role, slotIndex)) required.push("Group Photography");
   return required;
 }

@@ -150,10 +150,13 @@ export function CalendarView({
                           {[jd.schoolType, `${jd.setups} setup${jd.setups === 1 ? "" : "s"}`]
                             .filter(Boolean)
                             .join(" · ")}
-                          {(jd.is_outdoor || jd.has_group_photo) && (
+                          {(jd.is_outdoor || jd.has_group_photo || jd.is_babies) && (
                             <span>
                               {" "}
-                              · {[jd.is_outdoor && "Outdoor", jd.has_group_photo && "+Group"].filter(Boolean).join(", ")}
+                              ·{" "}
+                              {[jd.is_outdoor && "Outdoor", jd.has_group_photo && "+Group", jd.is_babies && "Babies"]
+                                .filter(Boolean)
+                                .join(", ")}
                             </span>
                           )}
                         </div>

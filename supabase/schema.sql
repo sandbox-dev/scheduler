@@ -70,6 +70,12 @@ create table if not exists picture_days (
 alter table picture_days add column if not exists is_outdoor boolean not null default false;
 alter table picture_days add column if not exists has_group_photo boolean not null default false;
 
+-- Babies shoots need a photographer qualified in "Babies Photography" —
+-- not every photographer is trained on infants. Mirrors is_outdoor: every
+-- Photographer slot on a flagged day requires the qualification, no change
+-- to crew size.
+alter table picture_days add column if not exists is_babies boolean not null default false;
+
 -- Manual nudges on top of the normal crew formula, for special cases (e.g. a
 -- school that always wants one extra assistant). Applied as a delta, not a
 -- replacement, so the underlying rule stays visible. Clamped at 0 minimum.

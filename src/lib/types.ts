@@ -8,9 +8,10 @@ export type Category = (typeof CATEGORIES)[number];
 // Specialty skills a job can require in addition to the school-type category:
 // an outdoor-flagged day needs a photographer qualified in "Outdoor
 // Photography"; a "+ group photo" day needs one qualified in "Group
+// Photography"; a "babies"-flagged day needs one qualified in "Babies
 // Photography". Staff can hold any mix of school-type and specialty
 // qualifications.
-export const SPECIALTIES = ["Outdoor Photography", "Group Photography"] as const;
+export const SPECIALTIES = ["Outdoor Photography", "Group Photography", "Babies Photography"] as const;
 export type Specialty = (typeof SPECIALTIES)[number];
 
 export const QUALIFICATIONS = [...CATEGORIES, ...SPECIALTIES] as const;
@@ -58,6 +59,7 @@ export type PictureDay = {
   requires_supervisor: boolean;
   is_outdoor: boolean;
   has_group_photo: boolean;
+  is_babies: boolean;
   has_trainee: boolean;
   // True when key info (e.g. setups) wasn't known yet at booking time and
   // still needs an owner to confirm it. Cleared automatically on edit.

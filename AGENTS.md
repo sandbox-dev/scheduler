@@ -26,6 +26,7 @@ When `has_group_photo` is true, Photographer count is `setups + 1`, and the grou
 
 Every slot always requires the job's own category (`"Preschool"` or `"K-12"` — see `CATEGORIES` in `types.ts`; a K-12-qualified photographer can shoot any of the school's actual finer-grained `school_type` values like "TK-8" or "Pre-8", since `school_type` is reference-only and never gates scheduling). On top of that:
 - Any Photographer slot on an `is_outdoor` day also requires **"Outdoor Photography"**.
+- Any Photographer slot on an `is_babies` day also requires **"Babies Photography"** (built 2026-08-03 — not every photographer is trained on infants; mirrors `is_outdoor` exactly, including that it doesn't change crew size, only who can fill the slot).
 - The one group-photo slot (per §2) also requires **"Group Photography"**.
 
 Staff hold qualifications as a flat `categories: Qualification[]` array (categories + specialties mixed together) — there's no separate schema-level distinction between "school-type qualified" and "specialty qualified".
@@ -78,7 +79,6 @@ Built strictly from who was *actually assigned* to work a Picture Day (`schedule
 
 ## 12. What's still deferred / manual (check with Adi before assuming stale)
 
-- **"Babies" qualifier** — a booking flag + matching staff qualification for infant/baby photography, mirroring how Outdoor/Group Photography already work (§3). Needed before September 2026 per Adi; not started as of this writing.
 - **No invite/password-reset acceptance page** — creating a new staff login has to go through Supabase dashboard's "Create new user" (setting the password directly there and telling the person out of band), not "Send invitation" — the app has no route that handles a Supabase invite/recovery token yet.
 - **Save-on-blur for Staff email/phone** — no explicit Save button; edits commit on blur. Adi wants an explicit Save at least for those two fields, to avoid accidental changes. Not started; scope (just those fields vs. app-wide) undecided.
 - **Zapier email signatures** need fixing on the approval/availability-request emails — not urgent, exact issue not yet described.

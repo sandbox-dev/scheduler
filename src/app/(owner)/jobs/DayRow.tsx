@@ -125,6 +125,13 @@ export function DayRow({ day }: { day: PictureDay }) {
       <td>
         <input
           type="checkbox"
+          defaultChecked={day.is_babies}
+          onChange={(e) => startTransition(() => updateDay(day.id, "is_babies", e.target.checked))}
+        />
+      </td>
+      <td>
+        <input
+          type="checkbox"
           defaultChecked={day.has_trainee}
           onChange={(e) => startTransition(() => updateDay(day.id, "has_trainee", e.target.checked))}
         />

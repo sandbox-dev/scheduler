@@ -313,6 +313,7 @@ export default async function SchedulePage({
                         <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
                           <CategoryBadge category={jd.category} />
                           {jd.is_outdoor && <CategoryBadge category="Outdoor" />}
+                          {jd.is_babies && <CategoryBadge category="Babies" />}
                         </div>
                       </div>
                       <LockJobButton jobId={jd.jobId} locked={lockedJobIds.has(jd.jobId)} />
