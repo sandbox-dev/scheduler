@@ -57,3 +57,49 @@ export function RoleTag({ role, extra }: { role: Role; extra?: string }) {
     </span>
   );
 }
+
+// Button version of RoleTag/CategoryBadge-style pills, for places a plain
+// checkbox would look out of place (e.g. the Staff page) — same "off"
+// look as the shared .chip class, filled in the role's own color when on.
+export function RoleToggleChip({ role, active, onClick }: { role: Role; active: boolean; onClick: () => void }) {
+  const Icon = ROLE_ICON[role];
+  const color = ROLE_COLOR[role];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="chip"
+      style={
+        active
+          ? { background: `color-mix(in srgb, ${color} 16%, white)`, color, borderColor: `color-mix(in srgb, ${color} 45%, white)` }
+          : undefined
+      }
+    >
+      <Icon size={12} /> {role}
+    </button>
+  );
+}
+
+// "Photography" is dropped from the label here — it's implied by context
+// (Qualified Categories) and dropping it lets every chip share one fixed
+// width instead of stretching to fit "Outdoor Photography"/"Group
+// Photography". Display-only: the actual stored qualification string
+// (e.g. "Outdoor Photography") is untouched — callers still key/toggle on
+// that full value, this component just renders it shorter.
+export function CategoryToggleChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  const display = label.replace(/ Photography$/, "");
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="chip"
+      style={{
+        width: 88,
+        justifyContent: "center",
+        ...(active ? { background: "var(--gold-tint)", color: "var(--navy)", borderColor: "var(--gold)" } : {}),
+      }}
+    >
+      {display}
+    </button>
+  );
+}

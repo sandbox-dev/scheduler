@@ -7,7 +7,7 @@ import { EQUIPMENT_CASE_COUNT } from "@/lib/scheduling";
 import type { Role } from "@/lib/types";
 import { setAssignmentCase, swapAssignment } from "./actions";
 
-type Option = { id: string; name: string; seniority: number; distance_miles: number; available: boolean };
+type Option = { id: string; name: string; priority: number; distance_miles: number; available: boolean };
 
 export function ScheduleSlotCard({
   pictureDayId,
@@ -72,7 +72,7 @@ export function ScheduleSlotCard({
           <div style={{ fontWeight: 700, fontSize: 13.5 }}>{assigned.name}</div>
           <div style={{ display: "flex", gap: 10, marginTop: 4, fontSize: 11, color: "var(--muted)" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <Award size={11} /> Sr. {assigned.seniority}
+              <Award size={11} /> Pri. {assigned.priority}
             </span>
             <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
               <MapPin size={11} /> {assigned.distance_miles}mi
@@ -101,7 +101,7 @@ export function ScheduleSlotCard({
           <optgroup label="Available">
             {available.map((o) => (
               <option key={o.id} value={o.id}>
-                {o.name} (Sr.{o.seniority}, {o.distance_miles}mi)
+                {o.name} (Pri.{o.priority}, {o.distance_miles}mi)
               </option>
             ))}
           </optgroup>
@@ -110,7 +110,7 @@ export function ScheduleSlotCard({
           <optgroup label="Not marked available">
             {unavailable.map((o) => (
               <option key={o.id} value={o.id}>
-                {o.name} (Sr.{o.seniority}, {o.distance_miles}mi)
+                {o.name} (Pri.{o.priority}, {o.distance_miles}mi)
               </option>
             ))}
           </optgroup>

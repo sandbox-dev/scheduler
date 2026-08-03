@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { CategoryToggleChip, RoleToggleChip } from "@/components/ui";
 import { QUALIFICATIONS, ROLES, type Staff } from "@/lib/types";
 import { setStaffActive, setStaffMileageEligible, toggleStaffCategory, toggleStaffRole, updateStaffField } from "./actions";
 
 // Email/phone commit on an explicit Save click (Enter also works) instead of
 // on blur — Adi wants those two fields protected from accidental edits
-// (e.g. clicking away mid-edit), unlike location/seniority below which are
+// (e.g. clicking away mid-edit), unlike location/priority below which are
 // low-stakes enough to keep the old save-on-blur behavior.
 function SavableField({
   staffId,
@@ -78,30 +79,26 @@ export function StaffRow({ staff }: { staff: Staff }) {
         <SavableField staffId={staff.id} field="phone" defaultValue={staff.phone} type="tel" placeholder="(555) 555-5555" width={130} />
       </td>
       <td>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {ROLES.filter((role) => role !== "Trainee").map((role) => (
-            <label key={role} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--muted)", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={staff.roles.includes(role)}
-                onChange={() => startTransition(() => toggleStaffRole(staff.id, role, staff.roles))}
-              />
-              {role}
-            </label>
+            <RoleToggleChip
+              key={role}
+              role={role}
+              active={staff.roles.includes(role)}
+              onClick={() => startTransition(() => toggleStaffRole(staff.id, role, staff.roles))}
+            />
           ))}
         </div>
       </td>
       <td>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxWidth: 260 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxWidth: 300 }}>
           {QUALIFICATIONS.map((cat) => (
-            <label key={cat} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "var(--muted)", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={staff.categories.includes(cat)}
-                onChange={() => startTransition(() => toggleStaffCategory(staff.id, cat, staff.categories))}
-              />
-              {cat}
-            </label>
+            <CategoryToggleChip
+              key={cat}
+              label={cat}
+              active={staff.categories.includes(cat)}
+              onClick={() => startTransition(() => toggleStaffCategory(staff.id, cat, staff.categories))}
+            />
           ))}
         </div>
       </td>
@@ -122,10 +119,10 @@ export function StaffRow({ staff }: { staff: Staff }) {
           max={5}
           className="field-input"
           style={{ width: 60 }}
-          defaultValue={staff.seniority}
+          defaultValue={staff.priority}
           onBlur={(e) =>
             startTransition(() =>
-              updateStaffField(staff.id, "seniority", Math.min(5, Math.max(1, parseInt(e.target.value, 10) || 1)))
+              updateStaffField(staff.id, "priority", Math.min(5, Math.max(1, parseInt(e.target.value, 10) || 1)))
             )
           }
         />
@@ -135,14 +132,14 @@ export function StaffRow({ staff }: { staff: Staff }) {
           <button className="btn-secondary" onClick={() => startTransition(() => setStaffActive(staff.id, !staff.active))}>
             {staff.active ? "Deactivate" : "Reactivate"}
           </button>
-          <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--muted)", cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={staff.mileage_eligible}
-              onChange={(e) => startTransition(() => setStaffMileageEligible(staff.id, e.target.checked))}
-            />
+          <button
+            type="button"
+            className={`chip ${staff.mileage_eligible ? "available" : ""}`}
+            style={{ fontSize: 11, padding: "4px 9px" }}
+            onClick={() => startTransition(() => setStaffMileageEligible(staff.id, !staff.mileage_eligible))}
+          >
             Paid mileage
-          </label>
+          </button>
         </div>
       </td>
     </tr>

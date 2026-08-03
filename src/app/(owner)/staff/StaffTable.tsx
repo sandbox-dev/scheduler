@@ -22,25 +22,27 @@ export function StaffTable({ staff }: { staff: Staff[] }) {
           {showInactive ? "Hide inactive" : `Show inactive (${inactiveCount})`}
         </button>
       )}
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Phone</th>
-            <th>Roles</th>
-            <th>Categories</th>
-            <th>Home city</th>
-            <th>Seniority</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {visible.map((s) => (
-            <StaffRow key={s.id} staff={s} />
-          ))}
-        </tbody>
-      </table>
+      <div style={{ overflowX: "auto" }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Roles</th>
+              <th>Categories</th>
+              <th>Home city</th>
+              <th>Priority</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((s) => (
+              <StaffRow key={s.id} staff={s} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

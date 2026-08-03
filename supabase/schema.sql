@@ -106,6 +106,22 @@ create table if not exists staff (
 -- Staff page).
 alter table staff add column if not exists mileage_eligible boolean not null default true;
 
+-- One-time rename: "seniority" read as tenure/experience, but the field is
+-- really booking priority (higher = booked first) — Adi and Julia are the
+-- most senior staff by actual tenure, yet deliberately set themselves low
+-- here since they want to be booked LAST, which made the old name
+-- confusing. No behavior change, same 1-5 scale, same sort direction.
+-- Guarded so re-running this script after the first time is a no-op.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'staff' and column_name = 'seniority'
+  ) then
+    alter table staff rename column seniority to priority;
+  end if;
+end $$;
+
 create table if not exists availability (
   id uuid primary key default gen_random_uuid(),
   staff_id uuid not null references staff(id) on delete cascade,

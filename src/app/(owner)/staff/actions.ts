@@ -14,7 +14,7 @@ export async function addStaff(_prevState: AddStaffState, formData: FormData): P
 
   const roles = ROLES.filter((r) => formData.get(`role_${r}`) === "on") as Role[];
   const categories = QUALIFICATIONS.filter((c) => formData.get(`category_${c}`) === "on") as Qualification[];
-  const seniority = Math.min(5, Math.max(1, parseInt(String(formData.get("seniority") || "1"), 10) || 1));
+  const priority = Math.min(5, Math.max(1, parseInt(String(formData.get("priority") || "1"), 10) || 1));
   const distance = parseFloat(String(formData.get("distance") || "0")) || 0;
   const location = String(formData.get("location") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
@@ -25,7 +25,7 @@ export async function addStaff(_prevState: AddStaffState, formData: FormData): P
     name,
     roles,
     categories,
-    seniority,
+    priority,
     distance_miles: distance,
     location,
     phone,
@@ -40,7 +40,7 @@ export async function addStaff(_prevState: AddStaffState, formData: FormData): P
 
 export async function updateStaffField(
   staffId: string,
-  field: "distance_miles" | "seniority" | "location" | "phone" | "email",
+  field: "distance_miles" | "priority" | "location" | "phone" | "email",
   value: number | string
 ) {
   const supabase = await createClient();

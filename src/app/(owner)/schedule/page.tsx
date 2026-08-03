@@ -121,7 +121,7 @@ export default async function SchedulePage({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div>
           <div className="display" style={{ fontSize: 21, fontWeight: 800 }}>Schedule — {monthLabel(month)}</div>
-          <div style={{ fontSize: 13.5, color: "var(--muted)" }}>Ranks available staff by seniority, then category match, then distance from the job.</div>
+          <div style={{ fontSize: 13.5, color: "var(--muted)" }}>Ranks available staff by priority, then category match, then distance from the job.</div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
           <MonthPicker month={month} months={selectableMonths(monthsWithData)} monthsWithData={monthsWithData} />
@@ -358,7 +358,7 @@ export default async function SchedulePage({
                                       ? {
                                           id: s.id,
                                           name: s.name,
-                                          seniority: s.seniority,
+                                          priority: s.priority,
                                           distance_miles: distanceFor(s, jd.schoolId, distanceMap),
                                           available: availableSet.has(`${s.id}_${jd.id}`),
                                         }
@@ -367,7 +367,7 @@ export default async function SchedulePage({
                                   options={options.map((o) => ({
                                     id: o.id,
                                     name: o.name,
-                                    seniority: o.seniority,
+                                    priority: o.priority,
                                     distance_miles: distanceFor(o, jd.schoolId, distanceMap),
                                     available: availableSet.has(`${o.id}_${jd.id}`),
                                   }))}

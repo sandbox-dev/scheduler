@@ -77,7 +77,7 @@ export type Staff = {
   name: string;
   roles: Role[];
   categories: Qualification[];
-  seniority: number;
+  priority: number;
   distance_miles: number;
   location: string;
   phone: string;

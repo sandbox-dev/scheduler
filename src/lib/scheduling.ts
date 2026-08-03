@@ -201,7 +201,8 @@ export function generateSchedule(
 
     // Pool of candidates for a role+slot, filtered by availability, every
     // required qualification for that specific slot, and not already used
-    // elsewhere that date — ranked by seniority, then distance from the job.
+    // elsewhere that date — ranked by priority (who should get booked
+    // first), then distance from the job.
     const candidatesFor = (role: Role, slotIndex: number) =>
       roleCandidates(staff, role)
         .filter((s) => availByStaffAndDay.has(`${s.id}_${jd.id}`))
@@ -209,7 +210,7 @@ export function generateSchedule(
         .filter((s) => !usedPerDate[jd.date].has(s.id))
         .sort(
           (a, b) =>
-            b.seniority - a.seniority ||
+            b.priority - a.priority ||
             distanceFor(a, jd.schoolId, distanceMap) - distanceFor(b, jd.schoolId, distanceMap)
         );
 

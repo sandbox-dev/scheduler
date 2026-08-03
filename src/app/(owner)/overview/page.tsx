@@ -38,7 +38,7 @@ export default async function OverviewPage({
     { href: "/jobs", icon: CalendarDays, title: "Jobs", desc: "Import bookings and set setups per Picture Day." },
     { href: "/staff", icon: Users, title: "Staff", desc: "Roster, roles, and who can supervise." },
     { href: "/availability-tracker", icon: CheckCircle2, title: "Availability", desc: "Send dates and collect responses." },
-    { href: "/schedule", icon: Award, title: "Schedule", desc: "Auto-assign by seniority, category, distance." },
+    { href: "/schedule", icon: Award, title: "Schedule", desc: "Auto-assign by priority, category, distance." },
   ];
 
   return (
