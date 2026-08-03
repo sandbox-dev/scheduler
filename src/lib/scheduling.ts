@@ -156,10 +156,16 @@ export function neededDatesSummary(jobs: JobWithDays[]): NeededDate[] {
 // Every role except Trainee requires the staff member to be tagged with
 // that role. Trainee is deliberately open to any active staff member —
 // trainees are usually existing Assistants training up, not a separately
-// tagged qualification (see ROLES in types.ts).
+// tagged qualification (see ROLES in types.ts). Inactive staff (e.g.
+// someone who's left) are never offered as a candidate for a NEW
+// assignment, here or in auto-generation — an already-assigned staff
+// member who's since gone inactive still displays fine on their existing
+// assignment (that's resolved separately, via staffById), they just won't
+// be selectable again going forward.
 export function roleCandidates(staff: Staff[], role: Role) {
-  if (role === "Trainee") return staff;
-  return staff.filter((s) => s.roles.includes(role));
+  const active = staff.filter((s) => s.active);
+  if (role === "Trainee") return active;
+  return active.filter((s) => s.roles.includes(role));
 }
 
 export type ScheduleSlot = FlatJobDay & {
