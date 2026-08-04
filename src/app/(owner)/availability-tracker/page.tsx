@@ -77,7 +77,12 @@ export default async function AvailabilityTrackerPage({
               </div>
             )}
             <div style={{ marginTop: 12 }}>
-              <SendAvailabilityButton month={month} linkUrl={linkUrl} initialDeadline={link?.deadline_at} />
+              <SendAvailabilityButton
+                month={month}
+                linkUrl={linkUrl}
+                initialDeadline={link?.deadline_at}
+                staff={staff.map((s) => ({ id: s.id, name: s.name }))}
+              />
             </div>
           </>
         ) : (

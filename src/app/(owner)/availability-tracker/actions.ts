@@ -50,14 +50,18 @@ export type SendAvailabilityRequestsResult = { sent: number; skippedNoEmail: str
 export async function sendAvailabilityRequests(
   month: string,
   linkUrl: string,
-  deadlineAt: string
+  deadlineAt: string,
+  staffIds?: string[]
 ): Promise<SendAvailabilityRequestsResult> {
   const token = linkUrl.split("/").pop()!;
   const supabase = await createClient();
   // Clearing reminder_sent_at / deadline_notice_sent_at handles a re-send
   // with a pushed-out deadline — otherwise the old deadline's reminder or
   // studio notice having already fired would silently block one for the new
-  // deadline.
+  // deadline. This resets for everyone on the link even when staffIds only
+  // targets a subset — the deadline itself is shared by the whole link, not
+  // per-person, so a changed deadline should re-arm the reminder/notice
+  // check for every recipient, not just whoever this particular send targets.
   await supabase
     .from("availability_links")
     .update({ deadline_at: deadlineAt, reminder_sent_at: null, deadline_notice_sent_at: null })
@@ -67,7 +71,11 @@ export async function sendAvailabilityRequests(
   const webhookUrl = process.env.ZAPIER_AVAILABILITY_WEBHOOK_URL;
   const webhookConfigured = !!webhookUrl;
 
-  const staff = await getStaff();
+  // staffIds narrows to specific people (e.g. a staff member added mid-month,
+  // or re-flagging a last-minute date to a few people) — omit it to send to
+  // everyone active, same as before this option existed.
+  const targetIds = staffIds ? new Set(staffIds) : null;
+  const staff = (await getStaff()).filter((s) => !targetIds || targetIds.has(s.id));
   const skippedNoEmail: string[] = [];
   let sent = 0;
   const deadlineLabel = new Date(deadlineAt).toLocaleString(undefined, {

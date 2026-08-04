@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Mail } from "lucide-react";
 import { sendAvailabilityRequests } from "./actions";
 
@@ -12,19 +12,42 @@ function toLocalInputValue(isoString: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+type StaffOption = { id: string; name: string };
+
 export function SendAvailabilityButton({
   month,
   linkUrl,
   initialDeadline,
+  staff,
 }: {
   month: string;
   linkUrl: string;
   initialDeadline?: string | null;
+  staff: StaffOption[];
 }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deadline, setDeadline] = useState(initialDeadline ? toLocalInputValue(initialDeadline) : "");
+  // "Everyone" is the common case (a fresh month) — the picker only needs
+  // opening for the exceptions Adi described: a staff member added
+  // mid-month, or re-flagging a last-minute new date to specific people.
+  const [scope, setScope] = useState<"all" | "specific">("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(staff.map((s) => s.id)));
+
+  const targetIds = useMemo(
+    () => (scope === "all" ? staff.map((s) => s.id) : Array.from(selectedIds)),
+    [scope, staff, selectedIds]
+  );
+
+  function toggleStaff(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <div>
@@ -38,16 +61,52 @@ export function SendAvailabilityButton({
           onChange={(e) => setDeadline(e.target.value)}
         />
       </label>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+        {(["all", "specific"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            className={scope === s ? "btn-primary" : "btn-secondary"}
+            style={{ fontSize: 12, padding: "5px 10px" }}
+            onClick={() => setScope(s)}
+          >
+            {s === "all" ? "Everyone" : "Choose who"}
+          </button>
+        ))}
+      </div>
+
+      {scope === "specific" && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10, maxWidth: 420 }}>
+          {staff.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className="chip"
+              style={
+                selectedIds.has(s.id)
+                  ? { background: "var(--gold-tint)", color: "var(--navy)", borderColor: "var(--gold)" }
+                  : undefined
+              }
+              onClick={() => toggleStaff(s.id)}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <button
         className="btn-secondary"
-        disabled={pending || !deadline}
+        title="Emails every selected staff member their own PIN and the shared availability link for this month, and sets the deadline above."
+        disabled={pending || !deadline || targetIds.length === 0}
         onClick={() => {
           setError(null);
           setMessage(null);
           startTransition(async () => {
             try {
               const deadlineAt = new Date(deadline).toISOString();
-              const result = await sendAvailabilityRequests(month, linkUrl, deadlineAt);
+              const result = await sendAvailabilityRequests(month, linkUrl, deadlineAt, targetIds);
               if (!result.webhookConfigured) {
                 setMessage("No notification webhook configured yet — see README to set one up.");
               } else {
@@ -66,7 +125,7 @@ export function SendAvailabilityButton({
           });
         }}
       >
-        <Mail size={14} /> {pending ? "Sending…" : "Send availability request"}
+        <Mail size={14} /> {pending ? "Sending…" : scope === "all" ? "Send availability request" : `Send to ${targetIds.length} selected`}
       </button>
       {message && <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600, marginTop: 6, maxWidth: 320 }}>{message}</div>}
       {error && <div style={{ fontSize: 11.5, color: "var(--bad)", fontWeight: 600, marginTop: 6 }}>{error}</div>}
