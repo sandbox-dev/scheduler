@@ -8,7 +8,7 @@ import { MonthPicker } from "@/components/MonthPicker";
 import { JobForm } from "./JobForm";
 import { DayRow } from "./DayRow";
 import { RemoveJobButton } from "./RemoveJobButton";
-import { SchoolRow } from "./SchoolRow";
+import { SchoolsPanel } from "./SchoolsPanel";
 import { SchoolTypeInput } from "./SchoolTypeInput";
 import { EnrollmentInput } from "./EnrollmentInput";
 
@@ -76,47 +76,7 @@ export default async function JobsPage({
 
       {schools.length > 0 && (
         <Card style={{ marginBottom: 20, padding: 0 }}>
-          <details open={schoolsNeedingAddressAttention.length > 0}>
-            <summary
-              style={{
-                cursor: "pointer",
-                listStyle: "none",
-                padding: "20px 22px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <span>
-                <span className="display" style={{ fontSize: 15.5, fontWeight: 700 }}>
-                  Saved schools
-                </span>
-                <span style={{ fontSize: 12.5, color: "var(--muted)", marginLeft: 10 }}>
-                  ({schools.length}) — click to expand
-                </span>
-              </span>
-            </summary>
-            <div style={{ padding: "0 22px 20px" }}>
-              <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 12 }}>
-                Keep addresses current here — they&apos;re used for mileage and for staff-to-school distance lookups
-                on the Staff page.
-              </div>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>School</th>
-                    <th>Address</th>
-                    <th>Round-trip miles</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schools.map((s) => (
-                    <SchoolRow key={s.id} school={s} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
+          <SchoolsPanel schools={schools} defaultOpen={schoolsNeedingAddressAttention.length > 0} />
         </Card>
       )}
 

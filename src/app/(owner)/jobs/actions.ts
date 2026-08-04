@@ -143,7 +143,7 @@ export async function updateDay(
 
 export async function updateSchoolField(
   schoolId: string,
-  field: "address" | "round_trip_miles",
+  field: "name" | "address" | "round_trip_miles",
   value: string | number
 ) {
   const supabase = await createClient();

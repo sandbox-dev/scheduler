@@ -12,8 +12,17 @@ export function SchoolRow({ school }: { school: School }) {
 
   return (
     <tr style={flagged ? { background: "var(--gold-tint)" } : undefined}>
-      <td style={{ fontWeight: 700 }}>
-        {school.name}
+      <td>
+        <input
+          type="text"
+          className="field-input"
+          style={{ fontWeight: 700, width: 170 }}
+          defaultValue={school.name}
+          onBlur={(e) => {
+            const value = e.target.value.trim();
+            if (value) startTransition(() => updateSchoolField(school.id, "name", value));
+          }}
+        />
         {flagged && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10.5, color: "var(--navy)", fontWeight: 700, marginTop: 3 }}>
             <AlertTriangle size={11} /> {missingAddress ? "No address" : "Couldn't locate this address"}
