@@ -21,7 +21,9 @@ export function SchoolRow({ school }: { school: School }) {
           defaultValue={school.name}
           className="field-input-ghost"
           inputStyle={{ fontWeight: 700 }}
-          width={170}
+          width={180}
+          multiline
+          rows={2}
         />
         {flagged && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10.5, color: "var(--navy)", fontWeight: 700, marginTop: 3 }}>
@@ -35,6 +37,9 @@ export function SchoolRow({ school }: { school: School }) {
           defaultValue={school.address}
           placeholder="Street address, city, state, zip"
           className="field-input-ghost"
+          width={240}
+          multiline
+          rows={2}
         />
       </td>
       <td>
@@ -43,21 +48,22 @@ export function SchoolRow({ school }: { school: School }) {
           defaultValue={String(school.round_trip_miles)}
           type="number"
           className="field-input-ghost"
-          width={90}
+          width={72}
         />
       </td>
       <td>
         <button
           type="button"
           className="btn-secondary"
-          style={{ fontSize: 12, padding: "6px 10px" }}
+          title="Remove saved school"
+          style={{ padding: "6px 8px" }}
           onClick={() => {
             if (confirm(`Remove "${school.name}" from saved schools? Any job that used it keeps its own data — this only removes the shortcut for next time.`)) {
               startTransition(() => deleteSchool(school.id));
             }
           }}
         >
-          <Trash2 size={13} /> Remove
+          <Trash2 size={13} />
         </button>
       </td>
     </tr>

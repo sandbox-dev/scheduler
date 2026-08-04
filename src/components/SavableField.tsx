@@ -15,6 +15,8 @@ export function SavableField({
   width,
   className = "field-input",
   inputStyle,
+  multiline = false,
+  rows = 2,
 }: {
   onSave: (value: string) => void;
   defaultValue: string;
@@ -23,8 +25,10 @@ export function SavableField({
   width?: number;
   className?: string;
   inputStyle?: React.CSSProperties;
+  multiline?: boolean;
+  rows?: number;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const [dirty, setDirty] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -34,23 +38,32 @@ export function SavableField({
     setDirty(false);
   };
 
+  const shared = {
+    className,
+    style: { width, resize: "none" as const, ...inputStyle },
+    placeholder,
+    defaultValue,
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setDirty(e.target.value.trim() !== defaultValue),
+  };
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <input
-        ref={inputRef}
-        type={type}
-        className={className}
-        style={{ width, ...inputStyle }}
-        placeholder={placeholder}
-        defaultValue={defaultValue}
-        onChange={(e) => setDirty(e.target.value.trim() !== defaultValue)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && dirty) {
-            e.preventDefault();
-            save();
-          }
-        }}
-      />
+    <div style={{ display: "flex", alignItems: multiline ? "flex-start" : "center", gap: 6 }}>
+      {multiline ? (
+        <textarea ref={inputRef as React.RefObject<HTMLTextAreaElement>} rows={rows} {...shared} />
+      ) : (
+        <input
+          ref={inputRef as React.RefObject<HTMLInputElement>}
+          type={type}
+          {...shared}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && dirty) {
+              e.preventDefault();
+              save();
+            }
+          }}
+        />
+      )}
       {dirty && (
         <button
           type="button"
