@@ -54,6 +54,7 @@ export function SchoolsPanel({ schools, defaultOpen }: { schools: School[]; defa
                 <th>School</th>
                 <th>Address</th>
                 <th>Round-trip miles</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>

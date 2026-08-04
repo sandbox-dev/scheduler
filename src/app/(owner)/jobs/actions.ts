@@ -154,3 +154,14 @@ export async function updateSchoolField(
   revalidatePath("/jobs");
   revalidatePath("/staff");
 }
+
+// Safe to delete any time — jobs.school_id is "on delete set null", so an
+// existing job that used this saved school keeps its own name/dates/roster
+// untouched, it just loses the "saved school" convenience link for next
+// time. Only removes the saved-school shortcut, never a job itself.
+export async function deleteSchool(schoolId: string) {
+  const supabase = await createClient();
+  await supabase.from("schools").delete().eq("id", schoolId);
+  revalidatePath("/jobs");
+  revalidatePath("/staff");
+}

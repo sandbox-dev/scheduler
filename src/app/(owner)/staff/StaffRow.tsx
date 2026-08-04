@@ -1,70 +1,10 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useTransition } from "react";
 import { CategoryToggleChip, RoleToggleChip } from "@/components/ui";
+import { SavableField } from "@/components/SavableField";
 import { QUALIFICATIONS, ROLES, type Staff } from "@/lib/types";
 import { setStaffActive, setStaffMileageEligible, toggleStaffCategory, toggleStaffRole, updateStaffField } from "./actions";
-
-// Email/phone commit on an explicit Save click (Enter also works) instead of
-// on blur — Adi wants those two fields protected from accidental edits
-// (e.g. clicking away mid-edit), unlike location/priority below which are
-// low-stakes enough to keep the old save-on-blur behavior.
-function SavableField({
-  staffId,
-  field,
-  defaultValue,
-  type,
-  placeholder,
-  width,
-}: {
-  staffId: string;
-  field: "email" | "phone";
-  defaultValue: string;
-  type: string;
-  placeholder: string;
-  width: number;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dirty, setDirty] = useState(false);
-  const [pending, startTransition] = useTransition();
-
-  const save = () => {
-    const value = inputRef.current!.value.trim();
-    startTransition(() => updateStaffField(staffId, field, value));
-    setDirty(false);
-  };
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <input
-        ref={inputRef}
-        type={type}
-        className="field-input"
-        style={{ width }}
-        placeholder={placeholder}
-        defaultValue={defaultValue}
-        onChange={(e) => setDirty(e.target.value.trim() !== defaultValue)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && dirty) {
-            e.preventDefault();
-            save();
-          }
-        }}
-      />
-      {dirty && (
-        <button
-          type="button"
-          className="btn-secondary"
-          style={{ padding: "2px 8px", fontSize: 11 }}
-          disabled={pending}
-          onClick={save}
-        >
-          Save
-        </button>
-      )}
-    </div>
-  );
-}
 
 export function StaffRow({ staff }: { staff: Staff }) {
   const [, startTransition] = useTransition();
@@ -74,8 +14,20 @@ export function StaffRow({ staff }: { staff: Staff }) {
       <td style={{ fontWeight: 700 }}>{staff.name}</td>
       <td>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <SavableField staffId={staff.id} field="email" defaultValue={staff.email} type="email" placeholder="email@example.com" width={170} />
-          <SavableField staffId={staff.id} field="phone" defaultValue={staff.phone} type="tel" placeholder="(555) 555-5555" width={170} />
+          <SavableField
+            onSave={(value) => updateStaffField(staff.id, "email", value)}
+            defaultValue={staff.email}
+            type="email"
+            placeholder="email@example.com"
+            width={170}
+          />
+          <SavableField
+            onSave={(value) => updateStaffField(staff.id, "phone", value)}
+            defaultValue={staff.phone}
+            type="tel"
+            placeholder="(555) 555-5555"
+            width={170}
+          />
         </div>
       </td>
       <td>
