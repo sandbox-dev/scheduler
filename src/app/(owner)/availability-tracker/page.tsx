@@ -15,7 +15,11 @@ export default async function AvailabilityTrackerPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const sp = await searchParams;
-  const [jobs, staff, availability] = await Promise.all([getJobs(), getStaff(), getAvailability()]);
+  const [jobs, allStaff, availability] = await Promise.all([getJobs(), getStaff(), getAvailability()]);
+  // Same rule as everywhere else inactive staff are excluded (Schedule
+  // candidates, the Send-request action, the public form's own RPC) — a
+  // staff member who's left has nothing to respond to going forward.
+  const staff = allStaff.filter((s) => s.active);
 
   const allNeeded = neededDatesSummary(jobs);
   const monthsWithData = getMonthsWithDates(allNeeded.map((n) => n.date));
