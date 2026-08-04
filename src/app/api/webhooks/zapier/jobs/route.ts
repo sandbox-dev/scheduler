@@ -75,7 +75,15 @@ export async function POST(request: NextRequest) {
   const hasSetups = parsedSetups !== null && parsedSetups >= 1;
   const setups = hasSetups ? (parsedSetups as number) : 1;
   const isOutdoor = typeof body.indoor_outdoor === "string" && /outdoor/i.test(body.indoor_outdoor);
-  const schoolName = typeof body.school_name === "string" ? body.school_name.trim() : "";
+  // Pixifi sends a make-up day's school_name with a trailing "Makeup Day" /
+  // "Make Up Day" / "Make-Up Day" (inconsistent spacing/hyphenation across
+  // schools) — stripped before the saved-school lookup/insert below so a
+  // make-up booking reuses the school's one real saved entry instead of
+  // creating a fresh duplicate every time. The Job's own name/client (what
+  // actually shows on the Jobs page) is untouched — this only affects which
+  // `schools` row gets matched.
+  const rawSchoolName = typeof body.school_name === "string" ? body.school_name.trim() : "";
+  const schoolName = rawSchoolName.replace(/\s+make[\s-]?up\s+day$/i, "").trim();
   const schoolAddress = typeof body.school_address === "string" ? body.school_address.trim() : "";
   const fallbackRoundTripMiles = toNumber(body.round_trip_miles) ?? 0;
 
