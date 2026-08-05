@@ -101,7 +101,7 @@ This is optional — approving works fine without it, it just won't notify anyon
 
 ## Optional: email staff their availability link + PIN with one click
 
-On the Availability page, once you've generated a month's link, clicking **Send availability request** emails every active staff member individually — the shared link plus their own 4-digit PIN (shown on the Availability response tracker for reference). Each person picks their name on the link, enters their own PIN, and can only see/edit their own answers; once they submit, it locks (you can still override manually from the response tracker).
+On the Availability page, once you've generated a month's link, clicking **Send availability request** emails staff individually — the shared link plus their own 4-digit PIN (shown on the Availability response tracker for reference). Defaults to everyone active, or pick specific people instead (see "How the pieces fit together" below for that and the confirm-before-sending/send-log behavior). Each person picks their name on the link, enters their own PIN, and can only see/edit their own answers; once they submit, it locks (you can still override manually from the response tracker).
 
 1. Add each staff member's email on the Staff page.
 2. In Zapier, create a new Zap: trigger = **Webhooks by Zapier → Catch Hook**. Copy the custom webhook URL it gives you and set it as `ZAPIER_AVAILABILITY_WEBHOOK_URL`.
