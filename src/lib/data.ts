@@ -73,6 +73,21 @@ export async function getAvailabilityNotesForMonth(month: string): Promise<Avail
   return data as AvailabilityNote[];
 }
 
+export type AvailabilitySendLogEntry = { sent_at: string; sent_by: string; recipient_names: string[] };
+
+// Most recent first, so whoever's about to click "Send" sees the latest
+// send right at the top without having to scan the whole history.
+export async function getAvailabilitySendLog(month: string): Promise<AvailabilitySendLogEntry[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("availability_send_log")
+    .select("sent_at, sent_by, recipient_names")
+    .eq("month", month)
+    .order("sent_at", { ascending: false });
+  if (error) throw error;
+  return data as AvailabilitySendLogEntry[];
+}
+
 export type ScheduleApproval = { month: string; approved_at: string };
 
 export async function getApprovalForMonth(month: string): Promise<ScheduleApproval | null> {

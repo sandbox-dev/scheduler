@@ -110,7 +110,15 @@ Also added: a `title` tooltip on the Send button itself, since this is only used
 
 The result banner is also now typed (`{ kind: "sent" | "not-configured", text }` instead of a bare string) so a real send renders green/success (`CheckCircle2`) but "no webhook configured, nothing was sent" renders amber/warning (`AlertTriangle`, same `--gold-tint`/`--gold` as the Jobs/Staff "needs attention" banners) — these used to share one plain-string `message` state and render identically, which meant a configuration warning could look exactly like a successful send. This is the same class of issue the "visible confirmation" rule already covers elsewhere in this app (a side-effect action needs an obvious, honest banner) — worth checking any other send-and-report action in this app for the same silent-blend-of-success-and-warning risk if one comes up.
 
-## 17. What's still deferred / manual (check with Adi before assuming stale)
+## 17. Availability send log — who sent what, when (built 2026-08-05)
+
+New table `availability_send_log` (month, sent_at, sent_by, recipient_names[]) — one row per successful "Send availability request" click, appended by `sendAvailabilityRequests()` right after the webhook loop, only when `webhookConfigured` (a no-op "nothing sent" outcome never logs). `sent_by` is the calling owner's own email via `supabase.auth.getUser()` — the first time this app records *who* (not just *that*) an action happened, since Adi, Julia, and Steph all share equal full-owner access with no other way to tell each other apart. Adi's stated reason: "if I send it, and Steph goes to send, she'll see I already did it."
+
+Deliberately an append-only log, not a single "last sent" field on `availability_links` — a follow-up send to a few specific people (the §16 recipient picker) stays visible as its own row alongside the original send-to-everyone, rather than overwriting it. Rendered on the availability-tracker page directly above the Send button (most recent first, via `getAvailabilitySendLog()` in `lib/data.ts`), so it's the natural thing to notice before clicking Send again, not something that has to be sought out. Long recipient lists truncate to the first 3 + "+N more" rather than printing every name every time — matches the app's general "clean, minimal" bias, and the full list is only really needed for the exceptional narrow-recipient case, which is short by definition.
+
+Scoped to owner-initiated sends only — the automated reminder/deadline-missed cron emails aren't logged here, since those aren't at risk of two humans accidentally duplicating each other's click.
+
+## 18. What's still deferred / manual (check with Adi before assuming stale)
 
 - **No invite/password-reset acceptance page** — creating a new staff login has to go through Supabase dashboard's "Create new user" (setting the password directly there and telling the person out of band), not "Send invitation" — the app has no route that handles a Supabase invite/recovery token yet.
 - **Staff roles have no permission tiers** — any Supabase Auth login is full owner access; accepted as fine for the one additional staff login (Steph) that exists today, but worth remembering if a future login should have been more limited.

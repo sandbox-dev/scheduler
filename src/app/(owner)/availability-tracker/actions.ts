@@ -77,6 +77,7 @@ export async function sendAvailabilityRequests(
   const targetIds = staffIds ? new Set(staffIds) : null;
   const staff = (await getStaff()).filter((s) => !targetIds || targetIds.has(s.id));
   const skippedNoEmail: string[] = [];
+  const sentToNames: string[] = [];
   let sent = 0;
   const deadlineLabel = new Date(deadlineAt).toLocaleString(undefined, {
     dateStyle: "long",
@@ -105,7 +106,23 @@ export async function sendAvailabilityRequests(
         }),
       });
       sent++;
+      sentToNames.push(s.name);
     }
+
+    // Logged so a second owner login (Adi/Julia/Steph all share full owner
+    // access with no other way to tell) can see this month's request has
+    // already gone out before sending it again. Append-only on purpose — a
+    // follow-up send to a few specific people stays visible as its own row
+    // alongside the original send-to-everyone, not merged/overwritten.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    await supabase.from("availability_send_log").insert({
+      month,
+      sent_by: user?.email || "unknown",
+      recipient_names: sentToNames,
+    });
+    revalidatePath("/availability-tracker");
   }
 
   return { sent, skippedNoEmail, webhookConfigured };

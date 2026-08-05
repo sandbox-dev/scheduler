@@ -610,3 +610,21 @@ alter table availability_links add column if not exists reminder_sent_at timesta
 -- whether anyone's still missing (and notified the studio if so). Cleared
 -- back to null alongside reminder_sent_at on a re-send with a new deadline.
 alter table availability_links add column if not exists deadline_notice_sent_at timestamptz;
+
+-- One row per "Send availability request" click — lets one owner see that
+-- another already sent this month's request before sending it again (e.g.
+-- Adi and Steph both have full owner logins with no other way to tell).
+-- Intentionally a plain append-only log, not just a "last sent" field on
+-- availability_links, so a follow-up send to a few specific people (a
+-- late-added staff member, a last-minute new date) stays visible alongside
+-- the original send-to-everyone rather than overwriting it.
+create table if not exists availability_send_log (
+  id uuid primary key default gen_random_uuid(),
+  month date not null,
+  sent_at timestamptz not null default now(),
+  sent_by text not null default '',
+  recipient_names text[] not null default '{}'
+);
+alter table availability_send_log enable row level security;
+drop policy if exists "owners full access" on availability_send_log;
+create policy "owners full access" on availability_send_log for all to authenticated using (true) with check (true);

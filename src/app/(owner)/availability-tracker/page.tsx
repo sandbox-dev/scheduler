@@ -1,5 +1,12 @@
-import { Clock, CheckCircle2 } from "lucide-react";
-import { getActiveAvailabilityLinkForMonth, getAvailability, getAvailabilityNotesForMonth, getJobs, getStaff } from "@/lib/data";
+import { Clock, CheckCircle2, Send } from "lucide-react";
+import {
+  getActiveAvailabilityLinkForMonth,
+  getAvailability,
+  getAvailabilityNotesForMonth,
+  getAvailabilitySendLog,
+  getJobs,
+  getStaff,
+} from "@/lib/data";
 import { flattenJobDays, neededDatesSummary } from "@/lib/scheduling";
 import { getMonthsWithDates, monthLabel, pickDefaultMonth, selectableMonths } from "@/lib/month";
 import { Card } from "@/components/ui";
@@ -25,9 +32,10 @@ export default async function AvailabilityTrackerPage({
   const monthsWithData = getMonthsWithDates(allNeeded.map((n) => n.date));
   const month = sp.month && /^\d{4}-\d{2}-01$/.test(sp.month) ? sp.month : pickDefaultMonth(monthsWithData);
 
-  const [link, notes] = await Promise.all([
+  const [link, notes, sendLog] = await Promise.all([
     getActiveAvailabilityLinkForMonth(month),
     getAvailabilityNotesForMonth(month),
+    getAvailabilitySendLog(month),
   ]);
   const noteByStaff = new Map(notes.filter((n) => n.note.trim()).map((n) => [n.staff_id, n.note]));
 
@@ -76,6 +84,51 @@ export default async function AvailabilityTrackerPage({
                 </strong>
               </div>
             )}
+
+            {sendLog.length > 0 && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "10px 12px",
+                  background: "var(--bg)",
+                  border: "1px solid var(--line)",
+                  borderRadius: 10,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.03em",
+                    marginBottom: 8,
+                  }}
+                >
+                  <Send size={11} /> Already sent this month
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {sendLog.map((entry, i) => {
+                    const names = entry.recipient_names;
+                    const preview = names.length > 4 ? `${names.slice(0, 3).join(", ")} +${names.length - 3} more` : names.join(", ");
+                    return (
+                      <div key={i}>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink)" }}>
+                          {new Date(entry.sent_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 1 }}>
+                          {entry.sent_by} → {names.length} {names.length === 1 ? "person" : "people"}: {preview}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div style={{ marginTop: 12 }}>
               <SendAvailabilityButton
                 month={month}
