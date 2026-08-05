@@ -106,6 +106,10 @@ The shared deadline reset (`reminder_sent_at`/`deadline_notice_sent_at` cleared 
 
 Also added: a `title` tooltip on the Send button itself, since this is only used once a month and Adi wanted a reminder of what it actually does without having to re-derive it each time.
 
+**Confirm dialog + success/warning banner added same day, after a real incident:** the button originally sent on a single click with no confirmation — Adi accidentally sent live availability-request emails while testing it and asked "can we unsend???" (answer: no, once Gmail delivers it there's no recall from this app; only Gmail's own personal Undo-Send window, seconds long, could have, and by the time anyone notices it's already passed). `handleSend()` now always shows a `confirm()` dialog first, spelling out exactly who (`targetNames`, e.g. "all 7 active staff" or the specific names chosen) and the deadline in a human-readable format — every send, no exceptions, matching the same pattern already used for Remove Job/Remove School.
+
+The result banner is also now typed (`{ kind: "sent" | "not-configured", text }` instead of a bare string) so a real send renders green/success (`CheckCircle2`) but "no webhook configured, nothing was sent" renders amber/warning (`AlertTriangle`, same `--gold-tint`/`--gold` as the Jobs/Staff "needs attention" banners) — these used to share one plain-string `message` state and render identically, which meant a configuration warning could look exactly like a successful send. This is the same class of issue the "visible confirmation" rule already covers elsewhere in this app (a side-effect action needs an obvious, honest banner) — worth checking any other send-and-report action in this app for the same silent-blend-of-success-and-warning risk if one comes up.
+
 ## 17. What's still deferred / manual (check with Adi before assuming stale)
 
 - **No invite/password-reset acceptance page** — creating a new staff login has to go through Supabase dashboard's "Create new user" (setting the password directly there and telling the person out of band), not "Send invitation" — the app has no route that handles a Supabase invite/recovery token yet.
