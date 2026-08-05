@@ -178,7 +178,7 @@ export default async function AvailabilityTrackerPage({
                       {availableIds.length > 0 ? <CheckCircle2 size={14} /> : <Clock size={14} />}
                       {availableIds.length > 0 ? `${availableIds.length} of ${pictureDaysThisMonth.length}` : "Pending"}
                     </div>
-                    <AvailabilityChips staffId={s.id} pictureDays={pictureDaysThisMonth} initialAvailableIds={availableIds} />
+                    <AvailabilityChips staffId={s.id} staffName={s.name} pictureDays={pictureDaysThisMonth} initialAvailableIds={availableIds} />
                   </td>
                   <td style={{ verticalAlign: "top", maxWidth: 220, fontSize: 12.5, color: "var(--ink)" }}>
                     {note || <span style={{ color: "var(--muted)" }}>—</span>}

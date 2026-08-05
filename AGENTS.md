@@ -118,7 +118,11 @@ Deliberately an append-only log, not a single "last sent" field on `availability
 
 Scoped to owner-initiated sends only — the automated reminder/deadline-missed cron emails aren't logged here, since those aren't at risk of two humans accidentally duplicating each other's click.
 
-## 18. What's still deferred / manual (check with Adi before assuming stale)
+## 18. Confirm before a manual availability override (`AvailabilityChips.tsx`, built 2026-08-05)
+
+The response tracker's per-date chips (an owner directly overriding what a staff member submitted, or hasn't yet — `setStaffAvailability`) used to toggle instantly on click, no confirmation. Adi: a manual override is a real scheduling-affecting change, easy to fire by an accidental click while scanning the tracker, and asked for the same "are you sure" treatment as any other real-effect action in this app. `toggle()` now shows `confirm("Mark {name} as {available/NOT available} for {date}?")` before touching state or calling the action; declining leaves everything untouched. Only wired into the owner-facing tracker (`AvailabilityChips.tsx`) — the staff-facing public form (`AvailabilityForm.tsx`, a completely separate component) is unaffected, since a staff member submitting their own answers isn't the same "did I mean to click that" risk an owner scanning a table of everyone's data is.
+
+## 19. What's still deferred / manual (check with Adi before assuming stale)
 
 - **No invite/password-reset acceptance page** — creating a new staff login has to go through Supabase dashboard's "Create new user" (setting the password directly there and telling the person out of band), not "Send invitation" — the app has no route that handles a Supabase invite/recovery token yet.
 - **Staff roles have no permission tiers** — any Supabase Auth login is full owner access; accepted as fine for the one additional staff login (Steph) that exists today, but worth remembering if a future login should have been more limited.
