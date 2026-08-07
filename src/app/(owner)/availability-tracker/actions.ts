@@ -3,8 +3,10 @@
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getStaff } from "@/lib/data";
+import { getJobs, getStaff } from "@/lib/data";
+import { flattenJobDays } from "@/lib/scheduling";
 import { monthLabel } from "@/lib/month";
+import { parseIcsEvents, reconcile, type ReconciliationResult } from "@/lib/pixifi";
 
 const LINK_LIFETIME_DAYS = 45;
 
@@ -126,4 +128,31 @@ export async function sendAvailabilityRequests(
   }
 
   return { sent, skippedNoEmail, webhookConfigured };
+}
+
+export type PixifiCheckResult = { configured: false } | ({ configured: true } & ReconciliationResult);
+
+// Manual "Check Pixifi" button on the tracker page — fetches Pixifi's own
+// direct ICS calendar feed and cross-references it against this month's
+// Jobs/Picture Days by date + fuzzy school-name match, so a booking
+// mismatch (canceled in one system, missing from the other) surfaces
+// in-app right before sending the availability request, rather than an
+// automated cron job Adi could go months without noticing had broken.
+export async function checkPixifiReconciliation(month: string): Promise<PixifiCheckResult> {
+  const feedUrl = process.env.PIXIFI_ICS_FEED_URL;
+  if (!feedUrl) return { configured: false };
+
+  const res = await fetch(feedUrl, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Pixifi feed request failed (${res.status})`);
+  const icsText = await res.text();
+
+  const monthPrefix = month.slice(0, 7); // "YYYY-MM"
+  const pixifiEvents = parseIcsEvents(icsText).filter((e) => e.date.startsWith(monthPrefix));
+
+  const jobs = await getJobs();
+  const schedulerDays = flattenJobDays(jobs)
+    .filter((jd) => jd.date.startsWith(monthPrefix))
+    .map((jd) => ({ date: jd.date, school: jd.client || jd.jobName }));
+
+  return { configured: true, ...reconcile(pixifiEvents, schedulerDays) };
 }

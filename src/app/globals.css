@@ -10,6 +10,7 @@
   --gold: #F6D2C3;
   --gold-tint: #FBEEE6;
   --rose: #D9B0B0;
+  --rose-tint: #F7ECEC;
   --navy: #3B5B6A;
   --purple: #D8D0E8;
   --purple-tint: #F3F0FA;
@@ -50,6 +51,9 @@ html, body { background: var(--bg); color: var(--ink); font-family: 'Inter', san
 .btn-secondary:hover { border-color: var(--navy); color: var(--navy); }
 .btn-danger { background: #fff; color: var(--bad); border: 1px solid var(--line); padding: 9px 15px; border-radius: 12px; font-weight: 600; font-size: 13.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .btn-danger:hover { border-color: var(--bad); background: rgba(214,69,69,0.06); }
+.btn-rose { background: var(--rose-tint); color: #8A5461; border: 1px solid var(--rose); padding: 9px 15px; border-radius: 12px; font-weight: 600; font-size: 13.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.btn-rose:hover { filter: brightness(0.97); }
+.btn-rose:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .field-input, .field-select, .field-textarea { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 9px 11px; font-size: 13.5px; font-family: 'Inter', sans-serif; width: 100%; color: var(--ink); }
 .field-input:focus, .field-select:focus, .field-textarea:focus { outline: none; border-color: var(--navy); }

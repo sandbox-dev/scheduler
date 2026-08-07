@@ -63,7 +63,7 @@ export function SendAvailabilityButton({
     // who and what deadline, every time, is the guard against that.
     const deadlineLabel = new Date(deadline).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" });
     const confirmed = confirm(
-      `Send a real email to: ${targetNames.join(", ")}?\n\nRespond-by deadline: ${deadlineLabel}\n\nThis can't be undone. Continue?`
+      `Did you check Pixifi for this month yet?\n\nSend a real email to: ${targetNames.join(", ")}?\n\nRespond-by deadline: ${deadlineLabel}\n\nThis can't be undone. Continue?`
     );
     if (!confirmed) return;
 

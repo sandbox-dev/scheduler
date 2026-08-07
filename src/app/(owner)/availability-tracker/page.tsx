@@ -14,6 +14,7 @@ import { MonthPicker } from "@/components/MonthPicker";
 import { GenerateLinkButton } from "./GenerateLinkButton";
 import { CopyLinkBox } from "./CopyLinkBox";
 import { SendAvailabilityButton } from "./SendAvailabilityButton";
+import { PixifiCheckButton } from "./PixifiCheckButton";
 import { AvailabilityChips } from "./AvailabilityChips";
 
 export default async function AvailabilityTrackerPage({
@@ -130,6 +131,7 @@ export default async function AvailabilityTrackerPage({
             )}
 
             <div style={{ marginTop: 12 }}>
+              <PixifiCheckButton month={month} monthLabel={monthLabel(month)} />
               <SendAvailabilityButton
                 month={month}
                 linkUrl={linkUrl}
