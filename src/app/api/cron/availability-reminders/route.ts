@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { monthLabel } from "@/lib/month";
+import { postWebhook } from "@/lib/webhook";
 
 type SupabaseClient = ReturnType<typeof createServiceRoleClient>;
 
@@ -73,21 +74,17 @@ export async function GET(request: NextRequest) {
     if (reminderWebhook) {
       for (const s of pending) {
         if (!s.email?.trim()) continue;
-        await fetch(reminderWebhook, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            staff_name: s.name,
-            staff_email: s.email,
-            month: link.month,
-            month_label: monthLabel(link.month),
-            link: `${siteUrl}/availability/${link.token}`,
-            pin: s.pin,
-            deadline: link.deadline_at,
-            deadline_label: formatDeadline(link.deadline_at as string),
-          }),
+        const ok = await postWebhook("availability-reminder", reminderWebhook, {
+          staff_name: s.name,
+          staff_email: s.email,
+          month: link.month,
+          month_label: monthLabel(link.month),
+          link: `${siteUrl}/availability/${link.token}`,
+          pin: s.pin,
+          deadline: link.deadline_at,
+          deadline_label: formatDeadline(link.deadline_at as string),
         });
-        remindersSent++;
+        if (ok) remindersSent++;
       }
     }
 
@@ -116,18 +113,14 @@ export async function GET(request: NextRequest) {
     const pending = await getPendingStaff(supabase, link.month);
 
     if (pending.length > 0 && deadlineMissedWebhook) {
-      await fetch(deadlineMissedWebhook, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          month: link.month,
-          month_label: monthLabel(link.month),
-          deadline_label: formatDeadline(link.deadline_at as string),
-          missing_count: pending.length,
-          missing_names: pending.map((s) => s.name).join(", "),
-        }),
+      const ok = await postWebhook("deadline-missed", deadlineMissedWebhook, {
+        month: link.month,
+        month_label: monthLabel(link.month),
+        deadline_label: formatDeadline(link.deadline_at as string),
+        missing_count: pending.length,
+        missing_names: pending.map((s) => s.name).join(", "),
       });
-      deadlineNoticesSent++;
+      if (ok) deadlineNoticesSent++;
     }
 
     // Marked regardless of whether anyone was missing or the webhook is

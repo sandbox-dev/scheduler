@@ -7,6 +7,7 @@ import { getJobs, getStaff } from "@/lib/data";
 import { flattenJobDays } from "@/lib/scheduling";
 import { monthLabel } from "@/lib/month";
 import { parseIcsEvents, reconcile, isSchoolPictureDayEvent, type ReconciliationResult } from "@/lib/pixifi";
+import { postWebhook } from "@/lib/webhook";
 
 const LINK_LIFETIME_DAYS = 45;
 
@@ -93,22 +94,20 @@ export async function sendAvailabilityRequests(
         skippedNoEmail.push(s.name);
         continue;
       }
-      await fetch(webhookUrl!, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          staff_name: s.name,
-          staff_email: s.email,
-          month,
-          month_label: monthLabel(month),
-          link: linkUrl,
-          pin: s.pin,
-          deadline: deadlineAt,
-          deadline_label: deadlineLabel,
-        }),
+      const ok = await postWebhook("availability-request", webhookUrl!, {
+        staff_name: s.name,
+        staff_email: s.email,
+        month,
+        month_label: monthLabel(month),
+        link: linkUrl,
+        pin: s.pin,
+        deadline: deadlineAt,
+        deadline_label: deadlineLabel,
       });
-      sent++;
-      sentToNames.push(s.name);
+      if (ok) {
+        sent++;
+        sentToNames.push(s.name);
+      }
     }
 
     // Logged so a second owner login (Adi/Julia/Steph all share full owner

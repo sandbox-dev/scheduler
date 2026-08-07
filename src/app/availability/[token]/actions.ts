@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { monthLabel } from "@/lib/month";
+import { postWebhook } from "@/lib/webhook";
 
 export type UnlockResult = { error?: string; existing?: string[]; note?: string };
 
@@ -42,7 +43,7 @@ export async function submitAvailabilityFinal(
   if (error) return { error: "invalid_or_expired_link" };
 
   const result = data as SubmitResult;
-  if (result.ok) notifyOwners(result).catch(() => {});
+  if (result.ok) notifyOwners(result).catch((err) => console.error("notifyOwners failed", err));
   return result;
 }
 
@@ -56,19 +57,11 @@ async function notifyOwners(result: SubmitResult) {
 
   const submittedWebhook = process.env.ZAPIER_STAFF_SUBMITTED_WEBHOOK_URL;
   if (submittedWebhook) {
-    await fetch(submittedWebhook, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ staff_name: result.staff_name, month, month_label: monthLbl }),
-    });
+    await postWebhook("staff-submitted", submittedWebhook, { staff_name: result.staff_name, month, month_label: monthLbl });
   }
 
   const allSubmittedWebhook = process.env.ZAPIER_ALL_SUBMITTED_WEBHOOK_URL;
   if (result.all_submitted && allSubmittedWebhook) {
-    await fetch(allSubmittedWebhook, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ month, month_label: monthLbl }),
-    });
+    await postWebhook("all-submitted", allSubmittedWebhook, { month, month_label: monthLbl });
   }
 }

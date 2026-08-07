@@ -6,6 +6,7 @@ import { getAvailability, getJobs, getSchools, getScheduleAssignments, getStaff,
 import { assignEquipmentCases, buildStaffScheduleRows, fmtDate, generateSchedule, neededDatesSummary } from "@/lib/scheduling";
 import { monthLabel } from "@/lib/month";
 import { ROLES, type Role } from "@/lib/types";
+import { postWebhook } from "@/lib/webhook";
 
 // Scoped to a single month and skips locked jobs entirely — their
 // schedule_assignments are left untouched so a lock actually protects a
@@ -171,28 +172,24 @@ export async function approveSchedule(month: string): Promise<ApproveScheduleRes
         continue;
       }
 
-      await fetch(webhookUrl!, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          staff_name: s.name,
-          staff_email: s.email,
-          month,
-          month_label: monthLabel(month),
-          days: rows.map((r) => {
-            const { wd, md } = fmtDate(r.date);
-            return { date: `${wd} ${md}`, role: r.role, school: r.jobName, address: r.address, city: cityFromAddress(r.address) };
-          }),
-          summary: rows
-            .map((r) => {
-              const { wd, md } = fmtDate(r.date);
-              const city = cityFromAddress(r.address);
-              return `${wd} ${md} — ${r.role} at ${r.jobName}${city ? ` (${city})` : ""}`;
-            })
-            .join("\n"),
+      const ok = await postWebhook("schedule-approved", webhookUrl!, {
+        staff_name: s.name,
+        staff_email: s.email,
+        month,
+        month_label: monthLabel(month),
+        days: rows.map((r) => {
+          const { wd, md } = fmtDate(r.date);
+          return { date: `${wd} ${md}`, role: r.role, school: r.jobName, address: r.address, city: cityFromAddress(r.address) };
         }),
+        summary: rows
+          .map((r) => {
+            const { wd, md } = fmtDate(r.date);
+            const city = cityFromAddress(r.address);
+            return `${wd} ${md} — ${r.role} at ${r.jobName}${city ? ` (${city})` : ""}`;
+          })
+          .join("\n"),
       });
-      emailed++;
+      if (ok) emailed++;
     }
   }
 
