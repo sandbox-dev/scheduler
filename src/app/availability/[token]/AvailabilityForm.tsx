@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { CheckCircle2, XCircle, Lock } from "lucide-react";
 import { Card } from "@/components/ui";
 import { fmtDate } from "@/lib/scheduling";
@@ -32,6 +32,22 @@ export function AvailabilityForm({
 
   const selectedStaff = staff.find((s) => s.id === staffId);
 
+  // Multiple jobs can be booked on the same calendar date — group by date
+  // so a staff member only ever sees (and taps) one chip per day, not one
+  // per booking. "Available" for a date means available for whichever job
+  // ends up scheduled that day, so a tap toggles every picture_day id
+  // sharing that date together.
+  const dateGroups = useMemo(() => {
+    const byDate = new Map<string, string[]>();
+    for (const pd of pictureDays) {
+      if (!byDate.has(pd.date)) byDate.set(pd.date, []);
+      byDate.get(pd.date)!.push(pd.id);
+    }
+    return Array.from(byDate.entries())
+      .map(([date, dayIds]) => ({ date, dayIds }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [pictureDays]);
+
   function resetForNewPerson(nextStaffId: string) {
     setStaffId(nextStaffId);
     setPin("");
@@ -60,11 +76,14 @@ export function AvailabilityForm({
     });
   }
 
-  function toggle(dayId: string) {
+  function toggleDate(dayIds: string[]) {
     setSelections((prev) => {
       const next = new Set(prev);
-      if (next.has(dayId)) next.delete(dayId);
-      else next.add(dayId);
+      const allSelected = dayIds.every((id) => next.has(id));
+      for (const id of dayIds) {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      }
       return next;
     });
   }
@@ -142,11 +161,11 @@ export function AvailabilityForm({
           </div>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {pictureDays.map((pd) => {
-              const isAvail = selections.has(pd.id);
-              const { wd, md } = fmtDate(pd.date);
+            {dateGroups.map(({ date, dayIds }) => {
+              const isAvail = dayIds.every((id) => selections.has(id));
+              const { wd, md } = fmtDate(date);
               return (
-                <div key={pd.id} className={`chip ${isAvail ? "available" : ""}`} onClick={() => toggle(pd.id)}>
+                <div key={date} className={`chip ${isAvail ? "available" : ""}`} onClick={() => toggleDate(dayIds)}>
                   {isAvail ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
                   {wd} {md}
                 </div>
