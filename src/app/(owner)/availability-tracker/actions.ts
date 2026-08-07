@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getJobs, getStaff } from "@/lib/data";
 import { flattenJobDays } from "@/lib/scheduling";
 import { monthLabel } from "@/lib/month";
-import { parseIcsEvents, reconcile, type ReconciliationResult } from "@/lib/pixifi";
+import { parseIcsEvents, reconcile, isSchoolPictureDayEvent, type ReconciliationResult } from "@/lib/pixifi";
 
 const LINK_LIFETIME_DAYS = 45;
 
@@ -147,7 +147,9 @@ export async function checkPixifiReconciliation(month: string): Promise<PixifiCh
   const icsText = await res.text();
 
   const monthPrefix = month.slice(0, 7); // "YYYY-MM"
-  const pixifiEvents = parseIcsEvents(icsText).filter((e) => e.date.startsWith(monthPrefix));
+  const pixifiEvents = parseIcsEvents(icsText)
+    .filter((e) => e.date.startsWith(monthPrefix))
+    .filter(isSchoolPictureDayEvent);
 
   const jobs = await getJobs();
   const schedulerDays = flattenJobDays(jobs)
