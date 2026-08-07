@@ -416,6 +416,21 @@ export function groupByWeek<T extends { date: string }>(items: T[]): [string, T[
   return Object.entries(weeks).sort(([a], [b]) => a.localeCompare(b));
 }
 
+// Multiple jobs can be booked on the same calendar date — anywhere staff
+// availability is shown per-date (the public form, the owner-facing
+// Response tracker) needs one entry per unique date, not one per
+// picture_day row, or the same date shows up duplicated once per booking.
+export function groupIdsByDate<T extends { id: string; date: string }>(items: T[]): { date: string; ids: string[] }[] {
+  const byDate = new Map<string, string[]>();
+  for (const item of items) {
+    if (!byDate.has(item.date)) byDate.set(item.date, []);
+    byDate.get(item.date)!.push(item.id);
+  }
+  return Array.from(byDate.entries())
+    .map(([date, ids]) => ({ date, ids }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export function fmtDate(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
   const wd = d.toLocaleDateString(undefined, { weekday: "short" });

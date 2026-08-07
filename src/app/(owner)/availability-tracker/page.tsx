@@ -7,7 +7,7 @@ import {
   getJobs,
   getStaff,
 } from "@/lib/data";
-import { flattenJobDays, neededDatesSummary } from "@/lib/scheduling";
+import { flattenJobDays, groupIdsByDate, neededDatesSummary } from "@/lib/scheduling";
 import { getMonthsWithDates, monthLabel, pickDefaultMonth, selectableMonths } from "@/lib/month";
 import { Card } from "@/components/ui";
 import { MonthPicker } from "@/components/MonthPicker";
@@ -45,6 +45,9 @@ export default async function AvailabilityTrackerPage({
     .map((jd) => ({ id: jd.id, date: jd.date }))
     .sort((a, b) => a.date.localeCompare(b.date));
   const pictureDayIdsThisMonth = new Set(pictureDaysThisMonth.map((pd) => pd.id));
+  // Multiple jobs can land on the same date — the header count below is
+  // "N of M dates", not "N of M bookings", so it needs unique-date groups.
+  const dateGroupsThisMonth = groupIdsByDate(pictureDaysThisMonth);
 
   const availableIdsByStaff = new Map<string, string[]>();
   availability.forEach((a) => {
@@ -161,6 +164,8 @@ export default async function AvailabilityTrackerPage({
           <tbody>
             {staff.map((s) => {
               const availableIds = availableIdsByStaff.get(s.id) || [];
+              const availableIdSet = new Set(availableIds);
+              const datesAvailable = dateGroupsThisMonth.filter((g) => g.ids.every((id) => availableIdSet.has(id))).length;
               const note = noteByStaff.get(s.id);
               return (
                 <tr key={s.id}>
@@ -174,11 +179,11 @@ export default async function AvailabilityTrackerPage({
                         gap: 5,
                         fontWeight: 600,
                         marginBottom: 6,
-                        color: availableIds.length > 0 ? "var(--good)" : "var(--muted)",
+                        color: datesAvailable > 0 ? "var(--good)" : "var(--muted)",
                       }}
                     >
-                      {availableIds.length > 0 ? <CheckCircle2 size={14} /> : <Clock size={14} />}
-                      {availableIds.length > 0 ? `${availableIds.length} of ${pictureDaysThisMonth.length}` : "Pending"}
+                      {datesAvailable > 0 ? <CheckCircle2 size={14} /> : <Clock size={14} />}
+                      {datesAvailable > 0 ? `${datesAvailable} of ${dateGroupsThisMonth.length}` : "Pending"}
                     </div>
                     <AvailabilityChips staffId={s.id} staffName={s.name} pictureDays={pictureDaysThisMonth} initialAvailableIds={availableIds} />
                   </td>

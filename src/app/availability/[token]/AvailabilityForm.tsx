@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { CheckCircle2, XCircle, Lock } from "lucide-react";
 import { Card } from "@/components/ui";
-import { fmtDate } from "@/lib/scheduling";
+import { fmtDate, groupIdsByDate } from "@/lib/scheduling";
 import { unlockStaffAvailability, submitAvailabilityFinal } from "./actions";
 
 type PictureDayInfo = { id: string; date: string; job_name: string; category: string };
@@ -37,16 +37,7 @@ export function AvailabilityForm({
   // per booking. "Available" for a date means available for whichever job
   // ends up scheduled that day, so a tap toggles every picture_day id
   // sharing that date together.
-  const dateGroups = useMemo(() => {
-    const byDate = new Map<string, string[]>();
-    for (const pd of pictureDays) {
-      if (!byDate.has(pd.date)) byDate.set(pd.date, []);
-      byDate.get(pd.date)!.push(pd.id);
-    }
-    return Array.from(byDate.entries())
-      .map(([date, dayIds]) => ({ date, dayIds }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [pictureDays]);
+  const dateGroups = useMemo(() => groupIdsByDate(pictureDays), [pictureDays]);
 
   function resetForNewPerson(nextStaffId: string) {
     setStaffId(nextStaffId);
@@ -161,7 +152,7 @@ export function AvailabilityForm({
           </div>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {dateGroups.map(({ date, dayIds }) => {
+            {dateGroups.map(({ date, ids: dayIds }) => {
               const isAvail = dayIds.every((id) => selections.has(id));
               const { wd, md } = fmtDate(date);
               return (
