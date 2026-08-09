@@ -18,7 +18,7 @@ async function getPendingStaff(supabase: SupabaseClient, month: string) {
 }
 
 function formatDeadline(deadlineAt: string) {
-  return new Date(deadlineAt).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" });
+  return new Date(deadlineAt).toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" });
 }
 
 // Runs on Vercel Cron (see vercel.json, once daily — Vercel's free Hobby
