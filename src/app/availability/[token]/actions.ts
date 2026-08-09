@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { monthLabel } from "@/lib/month";
 import { postWebhook } from "@/lib/webhook";
@@ -43,14 +44,22 @@ export async function submitAvailabilityFinal(
   if (error) return { error: "invalid_or_expired_link" };
 
   const result = data as SubmitResult;
-  if (result.ok) notifyOwners(result).catch((err) => console.error("notifyOwners failed", err));
+  if (result.ok) {
+    after(() => notifyOwners(result).catch((err) => console.error("notifyOwners failed", err)));
+  }
   return result;
 }
 
 // Lets the studio know a staff member has responded, and separately flags
-// once everyone active has — same fire-and-forget Zapier-webhook pattern as
-// every other notification in this app. A webhook failure here should never
-// block the staff member's own "submitted" confirmation screen.
+// once everyone active has. Runs via next/server's `after()` rather than a
+// bare un-awaited call: on Vercel, once this Server Action's response is
+// sent, the function's execution can be frozen/recycled, and a truly
+// fire-and-forget promise has no guarantee its in-flight fetch() ever
+// finishes — `after()` uses Vercel's waitUntil() to keep the invocation
+// alive until this completes, without making the staff member's own
+// "submitted" screen wait on it. Suspected root cause of the 2026-08-07
+// staff-submitted notifications going missing (see memory) after every more
+// obvious cause was ruled out.
 async function notifyOwners(result: SubmitResult) {
   const month = result.month!;
   const monthLbl = monthLabel(month);
