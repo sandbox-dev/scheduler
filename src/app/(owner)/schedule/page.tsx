@@ -68,6 +68,13 @@ export default async function SchedulePage({
   const approval = await getApprovalForMonth(month);
 
   const hasSchedule = assignments.length > 0;
+  // Same "which jobs does Regenerate actually touch" filter as
+  // generateAndSaveSchedule itself (unlocked + has a Picture Day this
+  // month) — shown in the Regenerate confirm dialog so a locked job
+  // someone forgot to re-lock doesn't get silently wiped and reassigned.
+  const jobsToRegenerate = jobs
+    .filter((j) => !j.locked && j.picture_days.some((d) => d.date.startsWith(month.slice(0, 7))))
+    .map((j) => j.name);
   const distanceMap = buildDistanceMap(staffSchoolDistances);
 
   const staffById = new Map(staff.map((s) => [s.id, s]));
@@ -148,7 +155,7 @@ export default async function SchedulePage({
               <Users size={14} /> By Staff
             </Link>
           </div>
-          <GenerateButton hasSchedule={hasSchedule} month={month} />
+          <GenerateButton hasSchedule={hasSchedule} month={month} jobNames={jobsToRegenerate} />
           <PrintButton weekStart={weekStart} />
         </div>
       </div>
@@ -316,7 +323,7 @@ export default async function SchedulePage({
                           {jd.is_babies && <CategoryBadge category="Babies" />}
                         </div>
                       </div>
-                      <LockJobButton jobId={jd.jobId} locked={lockedJobIds.has(jd.jobId)} />
+                      <LockJobButton jobId={jd.jobId} locked={lockedJobIds.has(jd.jobId)} jobName={jd.jobName} />
                     </div>
 
                     {ROLES.filter((r) => jd.crew[r] > 0).map((role) => {
