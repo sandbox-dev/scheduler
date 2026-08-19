@@ -26,7 +26,7 @@ export function SchoolsPanel({ schools, defaultOpen }: { schools: School[]; defa
       >
         <span>
           <span className="display" style={{ fontSize: 15.5, fontWeight: 700 }}>
-            Saved schools
+            Saved Schools
           </span>
           <span style={{ fontSize: 12.5, color: "var(--muted)", marginLeft: 10 }}>
             ({schools.length}) — click to expand

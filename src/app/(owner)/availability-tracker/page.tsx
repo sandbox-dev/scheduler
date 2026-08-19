@@ -150,7 +150,7 @@ export default async function AvailabilityTrackerPage({
 
       <Card>
         <div className="display" style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>
-          Response tracker — {monthLabel(month)}
+          Response Tracker — {monthLabel(month)}
         </div>
         <table className="data-table">
           <thead>

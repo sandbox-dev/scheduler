@@ -25,7 +25,7 @@ export function JobForm({ schools }: { schools: School[] }) {
 
   return (
     <Card style={{ marginBottom: 20 }}>
-      <div className="display" style={{ fontSize: 15.5, fontWeight: 700, marginBottom: 12 }}>Add a job</div>
+      <div className="display" style={{ fontSize: 15.5, fontWeight: 700, marginBottom: 12 }}>Add a Job</div>
 
       <form action={formAction}>
         <input type="hidden" name="schoolId" value={schoolId} />

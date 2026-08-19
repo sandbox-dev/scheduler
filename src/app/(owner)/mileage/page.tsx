@@ -54,7 +54,7 @@ export default async function MileagePage({
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 21, fontWeight: 800, marginBottom: 4 }}>Payroll &amp; reports</div>
+      <div className="display" style={{ fontSize: 21, fontWeight: 800, marginBottom: 4 }}>Payroll &amp; Reports</div>
       <div style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 16 }}>
         Pick any date range below to see how many setups it covers, how many staff by role, and the mileage pay for
         whoever actually worked it. Round-trip miles are from your studio ({STUDIO_ADDRESS}) at ${MILEAGE_RATE.toFixed(2)}/mile.
