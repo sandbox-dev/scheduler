@@ -118,7 +118,7 @@ Two more Zaps, both fired from the staff-facing availability link (not the owner
 2. **Everyone's submitted** — fires once, the moment every active staff member has responded for that month.
 
 1. In Zapier, create a Zap for each: trigger = **Webhooks by Zapier → Catch Hook**. Set the webhook URLs as `ZAPIER_STAFF_SUBMITTED_WEBHOOK_URL` and `ZAPIER_ALL_SUBMITTED_WEBHOOK_URL`.
-2. Add an action after each — **Email by Zapier** or **Gmail → Send Email** — to `hello@sandboxphotographers.com`. Use `staff_name` / `month_label` in the first, and just `month_label` in the second.
+2. Add an action after each — **Email by Zapier** or **Gmail → Send Email** — to `hello@sandboxphotographers.com`. Use `staff_name` / `month_label` / `link` (a direct link to that month's Availability Tracker — make it a clickable link in the email body) in the first, and just `month_label` in the second.
 3. Test by submitting availability as a staff member through the public link.
 
 Both are optional independently — leave either env var unset to skip that notification.

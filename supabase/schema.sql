@@ -611,6 +611,20 @@ alter table availability_links add column if not exists reminder_sent_at timesta
 -- back to null alongside reminder_sent_at on a re-send with a new deadline.
 alter table availability_links add column if not exists deadline_notice_sent_at timestamptz;
 
+-- Who this link's CURRENT deadline cycle actually applies to — null means
+-- "everyone active" (a normal send-to-everyone request), a real array means
+-- the most recent send narrowed to specific people (see sendAvailabilityRequests'
+-- staffIds param). Fixes a real incident (2026-08-14): two new trainees were
+-- sent their own narrow availability request; the whole rest of the staff
+-- list (already submitted weeks earlier under the original request, never
+-- sent this one) got the 24h reminder anyway, because the reminder cron had
+-- no way to know "pending" should mean "was asked and hasn't answered," not
+-- just "active and has no submission row for this month." Set on every send
+-- alongside the deadline reset above, for the same reason: a fresh send
+-- starts a fresh cycle, and the recipient scope is part of that cycle just
+-- like the deadline itself.
+alter table availability_links add column if not exists staff_ids uuid[];
+
 -- One row per "Send availability request" click — lets one owner see that
 -- another already sent this month's request before sending it again (e.g.
 -- Adi and Steph both have full owner logins with no other way to tell).

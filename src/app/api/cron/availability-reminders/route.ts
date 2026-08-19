@@ -5,12 +5,23 @@ import { postWebhook } from "@/lib/webhook";
 
 type SupabaseClient = ReturnType<typeof createServiceRoleClient>;
 
-// Active staff for a month who don't have an availability_submissions row
-// yet — shared by both the pre-deadline reminder and the post-deadline
-// studio notice below.
-async function getPendingStaff(supabase: SupabaseClient, month: string) {
+// Active staff (optionally narrowed to a specific link's staff_ids — see
+// schema.sql's comment on availability_links.staff_ids) who don't have an
+// availability_submissions row yet — shared by both the pre-deadline
+// reminder and the post-deadline studio notice below.
+//
+// staffIds narrows "pending" to "was actually sent this link's current
+// request." Without it, every active staff member with no submission row
+// for `month` counts as pending, regardless of whether they were ever asked
+// — which is exactly the bug behind a real incident (2026-08-14): a narrow
+// send to two new trainees reminded the whole rest of an already-submitted
+// staff list, since nothing scoped "pending" to "this specific request."
+async function getPendingStaff(supabase: SupabaseClient, month: string, staffIds: string[] | null) {
+  let staffQuery = supabase.from("staff").select("id, name, email, pin").eq("active", true);
+  if (staffIds) staffQuery = staffQuery.in("id", staffIds);
+
   const [{ data: staff }, { data: submissions }] = await Promise.all([
-    supabase.from("staff").select("id, name, email, pin").eq("active", true),
+    staffQuery,
     supabase.from("availability_submissions").select("staff_id").eq("month", month),
   ]);
   const submittedIds = new Set((submissions ?? []).map((s) => s.staff_id));
@@ -58,7 +69,7 @@ export async function GET(request: NextRequest) {
   // ---------- Job 1: remind staff whose deadline is coming up ----------
   const { data: upcomingLinks, error: upcomingError } = await supabase
     .from("availability_links")
-    .select("token, month, deadline_at")
+    .select("token, month, deadline_at, staff_ids")
     .not("deadline_at", "is", null)
     .gt("deadline_at", now.toISOString())
     .lte("deadline_at", lookahead.toISOString())
@@ -69,7 +80,7 @@ export async function GET(request: NextRequest) {
   }
 
   for (const link of upcomingLinks ?? []) {
-    const pending = await getPendingStaff(supabase, link.month);
+    const pending = await getPendingStaff(supabase, link.month, link.staff_ids);
 
     if (reminderWebhook) {
       for (const s of pending) {
@@ -100,7 +111,7 @@ export async function GET(request: NextRequest) {
   // ---------- Job 2: tell the studio if a deadline just passed with stragglers ----------
   const { data: passedLinks, error: passedError } = await supabase
     .from("availability_links")
-    .select("token, month, deadline_at")
+    .select("token, month, deadline_at, staff_ids")
     .not("deadline_at", "is", null)
     .lte("deadline_at", now.toISOString())
     .is("deadline_notice_sent_at", null);
@@ -110,7 +121,7 @@ export async function GET(request: NextRequest) {
   }
 
   for (const link of passedLinks ?? []) {
-    const pending = await getPendingStaff(supabase, link.month);
+    const pending = await getPendingStaff(supabase, link.month, link.staff_ids);
 
     if (pending.length > 0 && deadlineMissedWebhook) {
       const ok = await postWebhook("deadline-missed", deadlineMissedWebhook, {
