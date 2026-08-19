@@ -20,7 +20,7 @@ export function AddStaffForm() {
 
   return (
     <Card style={{ marginBottom: 16 }}>
-      <div className="display" style={{ fontSize: 15.5, fontWeight: 700, marginBottom: 12 }}>Add staff member</div>
+      <div className="display" style={{ fontSize: 15.5, fontWeight: 700, marginBottom: 12 }}>Add Staff Member</div>
       <form action={formAction}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
           <input className="field-input" name="name" placeholder="Name" required />

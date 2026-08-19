@@ -46,7 +46,7 @@ export default async function OverviewPage({
       <Card accent="var(--navy)">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
           <div>
-            <div className="display" style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>{monthLabel(month)}, at a glance</div>
+            <div className="display" style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>{monthLabel(month)}, At a Glance</div>
             <div style={{ color: "var(--muted)", fontSize: 13.5 }}>Every job, every Picture Day, one clean view.</div>
           </div>
           <MonthPicker month={month} months={selectableMonths(monthsWithData)} monthsWithData={monthsWithData} />
