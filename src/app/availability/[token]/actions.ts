@@ -63,10 +63,16 @@ export async function submitAvailabilityFinal(
 async function notifyOwners(result: SubmitResult) {
   const month = result.month!;
   const monthLbl = monthLabel(month);
+  // Straight to this month's tracker instead of the studio having to open
+  // the app and pick the month by hand (Adi, scheduler backlog #1) — the
+  // tracker page already reads ?month= (MonthPicker), so this is a real
+  // one-click deep link, not just the app's homepage.
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const trackerLink = `${siteUrl}/availability-tracker?month=${month}`;
 
   const submittedWebhook = process.env.ZAPIER_STAFF_SUBMITTED_WEBHOOK_URL;
   if (submittedWebhook) {
-    await postWebhook("staff-submitted", submittedWebhook, { staff_name: result.staff_name, month, month_label: monthLbl });
+    await postWebhook("staff-submitted", submittedWebhook, { staff_name: result.staff_name, month, month_label: monthLbl, link: trackerLink });
   }
 
   const allSubmittedWebhook = process.env.ZAPIER_ALL_SUBMITTED_WEBHOOK_URL;

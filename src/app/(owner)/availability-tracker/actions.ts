@@ -61,13 +61,17 @@ export async function sendAvailabilityRequests(
   // Clearing reminder_sent_at / deadline_notice_sent_at handles a re-send
   // with a pushed-out deadline — otherwise the old deadline's reminder or
   // studio notice having already fired would silently block one for the new
-  // deadline. This resets for everyone on the link even when staffIds only
-  // targets a subset — the deadline itself is shared by the whole link, not
-  // per-person, so a changed deadline should re-arm the reminder/notice
-  // check for every recipient, not just whoever this particular send targets.
+  // deadline. The deadline itself is still shared by the whole link, not
+  // per-person, so a changed deadline re-arms the reminder/notice check for
+  // every CURRENT recipient — but staff_ids now records exactly who that is
+  // for this cycle (null = everyone active), so the reminder cron can tell
+  // "was sent this request and hasn't answered" apart from "just happens to
+  // have no submission row for this month" (real incident, 2026-08-14: a
+  // narrow send to two new trainees caused the whole rest of the already-
+  // submitted staff list to get reminded too).
   await supabase
     .from("availability_links")
-    .update({ deadline_at: deadlineAt, reminder_sent_at: null, deadline_notice_sent_at: null })
+    .update({ deadline_at: deadlineAt, reminder_sent_at: null, deadline_notice_sent_at: null, staff_ids: staffIds ?? null })
     .eq("token", token);
   revalidatePath("/availability-tracker");
 
