@@ -45,7 +45,7 @@ export async function submitAvailabilityFinal(
 
   const result = data as SubmitResult;
   if (result.ok) {
-    after(() => notifyOwners(result).catch((err) => console.error("notifyOwners failed", err)));
+    after(() => notifyOwners(result, staffId).catch((err) => console.error("notifyOwners failed", err)));
   }
   return result;
 }
@@ -60,15 +60,19 @@ export async function submitAvailabilityFinal(
 // "submitted" screen wait on it. Suspected root cause of the 2026-08-07
 // staff-submitted notifications going missing (see memory) after every more
 // obvious cause was ruled out.
-async function notifyOwners(result: SubmitResult) {
+async function notifyOwners(result: SubmitResult, staffId: string) {
   const month = result.month!;
   const monthLbl = monthLabel(month);
   // Straight to this month's tracker instead of the studio having to open
   // the app and pick the month by hand (Adi, scheduler backlog #1) — the
   // tracker page already reads ?month= (MonthPicker), so this is a real
-  // one-click deep link, not just the app's homepage.
+  // one-click deep link, not just the app's homepage. The #staff-<id>
+  // fragment (scheduler backlog #1, extended) also scrolls straight to
+  // and highlights this specific person's row (see globals.css's
+  // `tr.staff-row:target` rule) instead of landing on the tracker and
+  // making Adi scan the whole table for who just submitted.
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const trackerLink = `${siteUrl}/availability-tracker?month=${month}`;
+  const trackerLink = `${siteUrl}/availability-tracker?month=${month}#staff-${staffId}`;
 
   const submittedWebhook = process.env.ZAPIER_STAFF_SUBMITTED_WEBHOOK_URL;
   if (submittedWebhook) {
