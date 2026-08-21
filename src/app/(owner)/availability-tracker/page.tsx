@@ -168,7 +168,7 @@ export default async function AvailabilityTrackerPage({
               const datesAvailable = dateGroupsThisMonth.filter((g) => g.ids.every((id) => availableIdSet.has(id))).length;
               const note = noteByStaff.get(s.id);
               return (
-                <tr key={s.id}>
+                <tr key={s.id} id={`staff-${s.id}`} className="staff-row">
                   <td style={{ fontWeight: 600, verticalAlign: "top" }}>{s.name}</td>
                   <td style={{ verticalAlign: "top", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{s.pin}</td>
                   <td>
