@@ -121,3 +121,19 @@ export async function getActiveAvailabilityLinkForMonth(month: string): Promise<
   if (error) throw error;
   return data as AvailabilityLink | null;
 }
+
+// Which staff members have already tapped Submit on the public availability
+// link for this month, and are therefore locked out of changing their own
+// answers (see AGENTS.md §8). Surfaced on the Availability Tracker so the
+// owner can tell "hasn't responded" apart from "responded and can't edit" —
+// the two look identical from availability rows alone, which is what made a
+// changed-availability request have to arrive by email before Reopen existed.
+export async function getSubmittedStaffIdsForMonth(month: string): Promise<Set<string>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("availability_submissions")
+    .select("staff_id")
+    .eq("month", month);
+  if (error) throw error;
+  return new Set((data as { staff_id: string }[]).map((r) => r.staff_id));
+}
