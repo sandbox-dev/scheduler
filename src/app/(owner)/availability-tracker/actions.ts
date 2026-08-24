@@ -8,6 +8,7 @@ import { flattenJobDays } from "@/lib/scheduling";
 import { monthLabel } from "@/lib/month";
 import { parseIcsEvents, reconcile, isSchoolPictureDayEvent, type ReconciliationResult } from "@/lib/pixifi";
 import { postWebhook } from "@/lib/webhook";
+import { linkHasBeenSent, mergeAskedStaffIds } from "@/lib/availability";
 
 const LINK_LIFETIME_DAYS = 45;
 
@@ -63,15 +64,33 @@ export async function sendAvailabilityRequests(
   // studio notice having already fired would silently block one for the new
   // deadline. The deadline itself is still shared by the whole link, not
   // per-person, so a changed deadline re-arms the reminder/notice check for
-  // every CURRENT recipient — but staff_ids now records exactly who that is
-  // for this cycle (null = everyone active), so the reminder cron can tell
+  // every CURRENT recipient — but staff_ids records exactly who has been
+  // asked this month (null = everyone active), so the reminder cron can tell
   // "was sent this request and hasn't answered" apart from "just happens to
   // have no submission row for this month" (real incident, 2026-08-14: a
   // narrow send to two new trainees caused the whole rest of the already-
   // submitted staff list to get reminded too).
+  //
+  // staff_ids ACCUMULATES across sends rather than being replaced — see
+  // mergeAskedStaffIds. Overwriting it meant a follow-up send to one
+  // late-added person silently removed everyone else still outstanding from
+  // both the 24h reminder and the deadline-missed notice, with nothing on
+  // screen to show it had happened (Adi caught this 2026-08-24 while asking
+  // whether a one-person send was safe mid-month — it wasn't).
+  const { data: existingLink } = await supabase
+    .from("availability_links")
+    .select("staff_ids, deadline_at")
+    .eq("token", token)
+    .maybeSingle();
+  const askedStaffIds = mergeAskedStaffIds(
+    (existingLink?.staff_ids as string[] | null) ?? null,
+    linkHasBeenSent(existingLink as { deadline_at: string | null } | null),
+    staffIds
+  );
+
   await supabase
     .from("availability_links")
-    .update({ deadline_at: deadlineAt, reminder_sent_at: null, deadline_notice_sent_at: null, staff_ids: staffIds ?? null })
+    .update({ deadline_at: deadlineAt, reminder_sent_at: null, deadline_notice_sent_at: null, staff_ids: askedStaffIds })
     .eq("token", token);
   revalidatePath("/availability-tracker");
 
