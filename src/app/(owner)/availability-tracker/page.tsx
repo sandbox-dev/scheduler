@@ -1,4 +1,4 @@
-import { Clock, CheckCircle2, Send } from "lucide-react";
+import { Clock, CheckCircle2, Lock, Send } from "lucide-react";
 import {
   getActiveAvailabilityLinkForMonth,
   getAvailability,
@@ -6,6 +6,7 @@ import {
   getAvailabilitySendLog,
   getJobs,
   getStaff,
+  getSubmittedStaffIdsForMonth,
 } from "@/lib/data";
 import { flattenJobDays, groupIdsByDate, neededDatesSummary } from "@/lib/scheduling";
 import { getMonthsWithDates, monthLabel, pickDefaultMonth, selectableMonths } from "@/lib/month";
@@ -16,6 +17,7 @@ import { CopyLinkBox } from "./CopyLinkBox";
 import { SendAvailabilityButton } from "./SendAvailabilityButton";
 import { PixifiCheckButton } from "./PixifiCheckButton";
 import { AvailabilityChips } from "./AvailabilityChips";
+import { ReopenButton } from "./ReopenButton";
 
 export default async function AvailabilityTrackerPage({
   searchParams,
@@ -33,10 +35,11 @@ export default async function AvailabilityTrackerPage({
   const monthsWithData = getMonthsWithDates(allNeeded.map((n) => n.date));
   const month = sp.month && /^\d{4}-\d{2}-01$/.test(sp.month) ? sp.month : pickDefaultMonth(monthsWithData);
 
-  const [link, notes, sendLog] = await Promise.all([
+  const [link, notes, sendLog, submittedIds] = await Promise.all([
     getActiveAvailabilityLinkForMonth(month),
     getAvailabilityNotesForMonth(month),
     getAvailabilitySendLog(month),
+    getSubmittedStaffIdsForMonth(month),
   ]);
   const noteByStaff = new Map(notes.filter((n) => n.note.trim()).map((n) => [n.staff_id, n.note]));
 
@@ -66,7 +69,8 @@ export default async function AvailabilityTrackerPage({
       <div style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 16 }}>
         Generate a month&apos;s link and send it to staff yourself (text or email) — no account required for them to
         respond. You can also tap any date below to add or remove availability directly, e.g. if someone lets you
-        know about a change by phone.
+        know about a change by phone. Once someone submits they can&apos;t change their own answers — tap <strong>Reopen</strong>
+        by their name to let them redo it themselves.
       </div>
 
       <Card style={{ marginBottom: 20 }}>
@@ -167,9 +171,30 @@ export default async function AvailabilityTrackerPage({
               const availableIdSet = new Set(availableIds);
               const datesAvailable = dateGroupsThisMonth.filter((g) => g.ids.every((id) => availableIdSet.has(id))).length;
               const note = noteByStaff.get(s.id);
+              const hasSubmitted = submittedIds.has(s.id);
               return (
                 <tr key={s.id} id={`staff-${s.id}`} className="staff-row">
-                  <td style={{ fontWeight: 600, verticalAlign: "top" }}>{s.name}</td>
+                  <td style={{ fontWeight: 600, verticalAlign: "top" }}>
+                    {s.name}
+                    {hasSubmitted && (
+                      <div style={{ display: "flex", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "var(--muted)",
+                            marginTop: 5,
+                          }}
+                        >
+                          <Lock size={11} /> Submitted
+                        </span>
+                        <ReopenButton month={month} monthLabel={monthLabel(month)} staffId={s.id} staffName={s.name} />
+                      </div>
+                    )}
+                  </td>
                   <td style={{ verticalAlign: "top", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{s.pin}</td>
                   <td>
                     <div
@@ -179,11 +204,14 @@ export default async function AvailabilityTrackerPage({
                         gap: 5,
                         fontWeight: 600,
                         marginBottom: 6,
-                        color: datesAvailable > 0 ? "var(--good)" : "var(--muted)",
+                        color: hasSubmitted || datesAvailable > 0 ? "var(--good)" : "var(--muted)",
                       }}
                     >
-                      {datesAvailable > 0 ? <CheckCircle2 size={14} /> : <Clock size={14} />}
-                      {datesAvailable > 0 ? `${datesAvailable} of ${dateGroupsThisMonth.length}` : "Pending"}
+                      {hasSubmitted || datesAvailable > 0 ? <CheckCircle2 size={14} /> : <Clock size={14} />}
+                      {/* Someone can submit and be available for none of the month's dates — without
+                          checking hasSubmitted that reads as "Pending" forever, indistinguishable from
+                          never having answered at all. */}
+                      {hasSubmitted || datesAvailable > 0 ? `${datesAvailable} of ${dateGroupsThisMonth.length}` : "Pending"}
                     </div>
                     <AvailabilityChips staffId={s.id} staffName={s.name} pictureDays={pictureDaysThisMonth} initialAvailableIds={availableIds} />
                   </td>

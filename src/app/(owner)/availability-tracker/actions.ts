@@ -3,7 +3,7 @@
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getJobs, getStaff } from "@/lib/data";
+import { getActiveAvailabilityLinkForMonth, getJobs, getStaff } from "@/lib/data";
 import { flattenJobDays } from "@/lib/scheduling";
 import { monthLabel } from "@/lib/month";
 import { parseIcsEvents, reconcile, isSchoolPictureDayEvent, type ReconciliationResult } from "@/lib/pixifi";
@@ -160,4 +160,97 @@ export async function checkPixifiReconciliation(month: string): Promise<PixifiCh
     .map((jd) => ({ date: jd.date, school: jd.client || jd.jobName }));
 
   return { configured: true, ...reconcile(pixifiEvents, schedulerDays) };
+}
+
+export type ReopenResult = {
+  staffName: string;
+  emailed: boolean;
+  reason?: "no_webhook" | "no_email" | "no_link" | "send_failed";
+  deadlineLabel: string | null;
+};
+
+// Undoes one staff member's submit-and-lock for a month so they can answer
+// again through the same link, and emails just them a fresh copy of it.
+//
+// Sending the link again on its own does nothing for someone who's already
+// submitted — not even a newly generated one, since the lock lives on
+// (staff, month) in availability_submissions, not on the token. Before this
+// existed, a staff member whose availability changed after submitting had
+// to email the studio and have an owner re-tick their dates by hand.
+//
+// Their existing answers are deliberately left in place: unlock_staff_
+// availability returns them, so the form comes up with the dates they'd
+// already picked still checked and their note intact, and they only change
+// what actually moved rather than rebuilding the whole month from memory.
+//
+// Deliberately does NOT touch the availability_links row — unlike
+// sendAvailabilityRequests, which sets deadline_at/staff_ids and re-arms
+// the reminder flags. Narrowing staff_ids to this one person would scope
+// the reminder cron's idea of "was asked" down to them alone and silently
+// drop everyone else still pending (the mirror image of the 2026-08-14
+// incident). One person being reopened is not a new request cycle.
+export async function reopenStaffAvailability(month: string, staffId: string): Promise<ReopenResult> {
+  const supabase = await createClient();
+
+  const { data: staffRow, error: staffError } = await supabase
+    .from("staff")
+    .select("name, email, pin")
+    .eq("id", staffId)
+    .single();
+  if (staffError || !staffRow) throw new Error("Couldn't find that staff member — please refresh and try again.");
+  const staffName = staffRow.name as string;
+
+  const { error: unlockError } = await supabase
+    .from("availability_submissions")
+    .delete()
+    .eq("staff_id", staffId)
+    .eq("month", month);
+  if (unlockError) throw new Error("Couldn't reopen their availability — please try again.");
+
+  revalidatePath("/availability-tracker");
+
+  const link = await getActiveAvailabilityLinkForMonth(month);
+  const deadlineLabel = link?.deadline_at
+    ? new Date(link.deadline_at).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" })
+    : null;
+
+  // Everything below is the email. The unlock above has already happened and
+  // stands on its own — if the email can't go out, say which reason rather
+  // than failing the whole action, so the owner knows to text them the link
+  // instead of being left unsure whether they were reopened at all.
+  const webhookUrl = process.env.ZAPIER_AVAILABILITY_WEBHOOK_URL;
+  if (!webhookUrl) return { staffName, emailed: false, reason: "no_webhook", deadlineLabel };
+  if (!link) return { staffName, emailed: false, reason: "no_link", deadlineLabel };
+  if (!String(staffRow.email ?? "").trim()) return { staffName, emailed: false, reason: "no_email", deadlineLabel };
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  // Reuses the existing "Send availability request" Zap rather than needing
+  // a new one set up — same payload shape, so the same email template just
+  // goes out again to one person.
+  const ok = await postWebhook("availability-request", webhookUrl, {
+    staff_name: staffName,
+    staff_email: staffRow.email,
+    month,
+    month_label: monthLabel(month),
+    link: `${siteUrl}/availability/${link.token}`,
+    pin: staffRow.pin,
+    deadline: link.deadline_at ?? "",
+    deadline_label: deadlineLabel ?? "as soon as possible",
+  });
+  if (!ok) return { staffName, emailed: false, reason: "send_failed", deadlineLabel };
+
+  // Logged the same way a normal send is, so the "Already sent this month"
+  // panel shows a reopen alongside the original request instead of an email
+  // going out with no trace of it on the page.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  await supabase.from("availability_send_log").insert({
+    month,
+    sent_by: user?.email || "unknown",
+    recipient_names: [`${staffName} (reopened)`],
+  });
+  revalidatePath("/availability-tracker");
+
+  return { staffName, emailed: true, deadlineLabel };
 }

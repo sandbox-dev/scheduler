@@ -101,7 +101,7 @@ This is optional — approving works fine without it, it just won't notify anyon
 
 ## Optional: email staff their availability link + PIN with one click
 
-On the Availability page, once you've generated a month's link, clicking **Send availability request** emails staff individually — the shared link plus their own 4-digit PIN (shown on the Availability response tracker for reference). Defaults to everyone active, or pick specific people instead (see "How the pieces fit together" below for that and the confirm-before-sending/send-log behavior). Each person picks their name on the link, enters their own PIN, and can only see/edit their own answers; once they submit, it locks (you can still override manually from the response tracker).
+On the Availability page, once you've generated a month's link, clicking **Send availability request** emails staff individually — the shared link plus their own 4-digit PIN (shown on the Availability response tracker for reference). Defaults to everyone active, or pick specific people instead (see "How the pieces fit together" below for that and the confirm-before-sending/send-log behavior). Each person picks their name on the link, enters their own PIN, and can only see/edit their own answers; once they submit, it locks (you can still override manually from the response tracker, or hit **Reopen** on their row to hand editing back to them — see below).
 
 1. Add each staff member's email on the Staff page.
 2. In Zapier, create a new Zap: trigger = **Webhooks by Zapier → Catch Hook**. Copy the custom webhook URL it gives you and set it as `ZAPIER_AVAILABILITY_WEBHOOK_URL`.
@@ -109,6 +109,16 @@ On the Availability page, once you've generated a month's link, clicking **Send 
 4. Test by clicking **Send availability request** in the app.
 
 This is optional — the link still works fine without it, you'd just copy/paste it yourself instead of one-click emailing everyone.
+
+## Letting someone redo their availability after they've submitted
+
+Submitting locks a staff member out of changing their own answers for that month. If their availability changes afterwards, their row on the Availability response tracker shows **Submitted** with a **Reopen** button next to it.
+
+Reopen does two things: it unlocks them for that month, and it emails them the link plus their PIN again (the same email "Send availability request" sends — no extra Zap to set up). When they open it, their existing dates come up already ticked and their note is still there, so they only change what actually moved. It asks you to confirm first, since it sends real email, and it's logged under "Already sent this month" so another owner can see it happened.
+
+It deliberately leaves the month's "respond by" deadline and reminder settings alone — reopening one person isn't a new request cycle, and changing them would affect everyone else's reminders too.
+
+If email isn't set up, there's no address on file for them, or the send fails, they're still reopened and the page tells you to send them the link yourself.
 
 ## Optional: notify the studio when staff respond
 
