@@ -167,3 +167,19 @@ export function scheduleApprovedEmail(e: {
     ),
   };
 }
+
+// Proves the whole chain — stored connection, Google, Gmail — in one click,
+// without involving a staff member. Deliberately says what it is in the
+// subject so a copy sitting in the studio's inbox is never mistaken for
+// something a staff member was also sent.
+export function testEmail(): { subject: string; htmlBody: string } {
+  return {
+    subject: "Test — Picture Day Scheduler email is working",
+    htmlBody: wrap(
+      `<p>This is a test from the Picture Day Scheduler.</p>` +
+        `<p>If you're reading it, the app can send email through your Gmail properly — availability requests, reminders and schedule emails will all go out.</p>` +
+        `<p style="color:${MUTED};font-size:13px;">Nobody else received this. Test emails only ever go to the studio.</p>` +
+        signOff()
+    ),
+  };
+}

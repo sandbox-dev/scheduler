@@ -8,10 +8,13 @@ import { flattenJobDays } from "@/lib/scheduling";
 import { monthLabel } from "@/lib/month";
 import { parseIcsEvents, reconcile, isSchoolPictureDayEvent, type ReconciliationResult } from "@/lib/pixifi";
 import { sendGmailMessage } from "@/lib/gmail";
-import { availabilityRequestEmail } from "@/lib/emails";
+import { availabilityRequestEmail, testEmail } from "@/lib/emails";
 import { linkHasBeenSent, mergeAskedStaffIds } from "@/lib/availability";
 
 const LINK_LIFETIME_DAYS = 45;
+
+// The studio's own inbox — the only address the test email can ever reach.
+const STUDIO_EMAIL = "hello@sandboxphotographers.com";
 
 export async function createAvailabilityLink(month: string) {
   const token = randomBytes(16).toString("hex");
@@ -273,4 +276,19 @@ export async function reopenStaffAvailability(month: string, staffId: string): P
   revalidatePath("/availability-tracker");
 
   return { staffName, emailed: true, deadlineLabel };
+}
+
+export type TestEmailResult = { ok: boolean; sentTo?: string; error?: string };
+
+// Sends one email to the studio's own address and nowhere else, so the email
+// connection can be checked without emailing a staff member to find out.
+//
+// Adi's question that prompted the whole move off Zapier was "I have no way
+// of knowing if the email sent" — a button that proves the chain end to end,
+// on demand, is the durable answer to that. Safe to press at any time: the
+// recipient is hardcoded, so it can never reach staff or a school.
+export async function sendTestEmail(): Promise<TestEmailResult> {
+  const { subject, htmlBody } = testEmail();
+  const result = await sendGmailMessage({ to: STUDIO_EMAIL, subject, htmlBody });
+  return result.ok ? { ok: true, sentTo: STUDIO_EMAIL } : { ok: false, error: result.error };
 }
