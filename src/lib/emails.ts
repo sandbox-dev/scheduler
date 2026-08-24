@@ -9,6 +9,8 @@
 // survives. Matches the timeline-builder app's house look (same font stack,
 // same button, same ink colour) so anything from Sandbox reads consistently.
 
+import { firstNameOf } from "./personName";
+
 const INK = "#20232B";
 const MUTED = "#6B7280";
 const WRAP = `font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:${INK};`;
@@ -61,7 +63,7 @@ export function availabilityRequestEmail(e: AvailabilityRequestEmail): { subject
   return {
     subject,
     htmlBody: wrap(
-      `<p>Hi ${escapeHtml(e.staffName)},</p>` +
+      `<p>Hi ${escapeHtml(firstNameOf(e.staffName))},</p>` +
         intro +
         button(e.link, e.reopened ? "UPDATE MY AVAILABILITY" : "SET MY AVAILABILITY") +
         `<p style="margin:0 0 6px;">Pick your name, then enter your PIN:</p>` +
@@ -85,7 +87,7 @@ export function availabilityReminderEmail(e: {
   return {
     subject: `Reminder: ${e.monthLabel} availability due ${e.deadlineLabel}`,
     htmlBody: wrap(
-      `<p>Hi ${escapeHtml(e.staffName)},</p>` +
+      `<p>Hi ${escapeHtml(firstNameOf(e.staffName))},</p>` +
         `<p>We haven't got your <strong>${escapeHtml(e.monthLabel)}</strong> Picture Day availability yet, and it's due <strong>${escapeHtml(e.deadlineLabel)}</strong>.</p>` +
         button(e.link, "SET MY AVAILABILITY") +
         `<p style="margin:0 0 6px;">Pick your name, then enter your PIN:</p>` +
@@ -159,7 +161,7 @@ export function scheduleApprovedEmail(e: {
   return {
     subject: `Your ${e.monthLabel} Picture Day schedule`,
     htmlBody: wrap(
-      `<p>Hi ${escapeHtml(e.staffName)},</p>` +
+      `<p>Hi ${escapeHtml(firstNameOf(e.staffName))},</p>` +
         `<p>Your <strong>${escapeHtml(e.monthLabel)}</strong> schedule is confirmed. Here's where you're booked:</p>` +
         `<table style="border-collapse:collapse;margin:16px 0;font-size:15px;">${rows}</table>` +
         `<p style="color:${MUTED};font-size:13px;">If anything here doesn't look right, reply to this email and let us know.</p>` +
