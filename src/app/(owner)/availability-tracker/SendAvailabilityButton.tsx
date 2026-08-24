@@ -26,7 +26,7 @@ export function SendAvailabilityButton({
   staff: StaffOption[];
 }) {
   const [pending, startTransition] = useTransition();
-  const [result, setResult] = useState<{ kind: "sent" | "not-configured"; text: string } | null>(null);
+  const [result, setResult] = useState<{ kind: "sent" | "warning"; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deadline, setDeadline] = useState(initialDeadline ? toLocalInputValue(initialDeadline) : "");
   // "Everyone" is the common case (a fresh month) — the picker only needs
@@ -71,20 +71,24 @@ export function SendAvailabilityButton({
       try {
         const deadlineAt = new Date(deadline).toISOString();
         const outcome = await sendAvailabilityRequests(month, linkUrl, deadlineAt, targetIds);
-        if (!outcome.webhookConfigured) {
-          setResult({ kind: "not-configured", text: "No notification webhook configured yet — see README to set one up. Nothing was sent." });
-        } else {
-          const notes: string[] = [];
-          if (outcome.skippedNoEmail.length > 0) {
-            notes.push(`no email on file for: ${outcome.skippedNoEmail.join(", ")}`);
-          }
-          setResult({
-            kind: "sent",
-            text:
-              `Sent to ${outcome.sent} staff member${outcome.sent === 1 ? "" : "s"}, each with their own PIN.` +
-              (notes.length > 0 ? ` Skipped — ${notes.join("; ")}.` : ""),
-          });
+        // Reports per-person truth now that the app sends through Gmail
+        // directly: `sent` counts messages Gmail actually accepted, and
+        // anyone it refused is named rather than folded into a total.
+        const notes: string[] = [];
+        if (outcome.skippedNoEmail.length > 0) {
+          notes.push(`no email address on file for ${outcome.skippedNoEmail.join(", ")}`);
         }
+        if (outcome.failed.length > 0) {
+          notes.push(`Gmail wouldn't send to ${outcome.failed.join(", ")} — contact them another way`);
+        }
+        setResult({
+          kind: outcome.failed.length > 0 || outcome.sent === 0 ? "warning" : "sent",
+          text:
+            (outcome.sent === 0
+              ? "No emails were sent."
+              : `Emailed ${outcome.sent} staff member${outcome.sent === 1 ? "" : "s"}, each with their own PIN. Copies are in your Gmail Sent folder.`) +
+            (notes.length > 0 ? ` Didn't go out — ${notes.join("; ")}.` : ""),
+        });
       } catch {
         setError("Couldn't send — please try again.");
       }

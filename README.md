@@ -88,79 +88,66 @@ The app exposes `POST /api/webhooks/zapier/jobs`, which creates a bare-bones Job
 
    `school_name` is matched against your saved schools with a trailing "Makeup Day"/"Make Up Day"/"Make-Up Day" stripped first, so a make-up day booking correctly reuses the school's one real saved entry instead of creating a fresh duplicate every time (Pixifi isn't consistent about spacing/hyphenation on that suffix, all variants are handled). This only affects which saved school gets matched — the Job's own name still shows exactly what Pixifi sent.
 
-## Optional: email staff their confirmed schedule when you approve it
+## Email — sent through your own Gmail
 
-On the Schedule page, clicking **Approve schedule** always marks that month approved. If you also set up this Zap, it additionally sends one email per staff member with their confirmed dates, roles, and schools.
+Every email this app sends goes out through the studio's own Gmail account, using the same connection the timeline-builder app uses. They land in your real Sent folder and replies come back to your real inbox, exactly as if you'd typed them yourself.
 
-1. Add each staff member's email on the Staff page (only `name` is required today — this feature needs `email` filled in per person).
-2. In Zapier, create a Zap: trigger = **Webhooks by Zapier → Catch Hook**. Copy the custom webhook URL it gives you and set it as `ZAPIER_SCHEDULE_WEBHOOK_URL`.
-3. Add an action after it — **Email by Zapier** (no account needed) or **Gmail → Send Email** if you'd rather it come from your own address. Send To: `staff_email`, and use `summary` (a plain-text list of their dates) or the `days` array (structured, if you want to format a table) in the body.
-4. Test by clicking **Approve schedule** in the app — the button reports how many people were emailed and flags anyone skipped for missing an email address.
+**There is nothing to set up here if timeline-builder's Gmail is already connected** — both apps share one Supabase project, so this app reads the same stored connection. Reconnecting Gmail on the timeline app's Settings page fixes both apps at once.
 
-This is optional — approving works fine without it, it just won't notify anyone.
+The app needs two values to use that connection. Set them on this project as well:
 
-## Optional: email staff their availability link + PIN with one click
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
 
-On the Availability page, once you've generated a month's link, clicking **Send availability request** emails staff individually — the shared link plus their own 4-digit PIN (shown on the Availability response tracker for reference). Defaults to everyone active, or pick specific people instead (see "How the pieces fit together" below for that and the confirm-before-sending/send-log behavior). Each person picks their name on the link, enters their own PIN, and can only see/edit their own answers; once they submit, it locks (you can still override manually from the response tracker, or hit **Reopen** on their row to hand editing back to them — see below).
+Both come from the same Google Cloud OAuth client the timeline app uses (Google Cloud Console → **APIs & Services → Credentials** → the OAuth 2.0 Client ID). They are the same values already set on the timeline-builder project; Vercel marks them Sensitive, so they can't be copied between projects from the command line — paste them in from Google Cloud Console.
 
-1. Add each staff member's email on the Staff page.
-2. In Zapier, create a new Zap: trigger = **Webhooks by Zapier → Catch Hook**. Copy the custom webhook URL it gives you and set it as `ZAPIER_AVAILABILITY_WEBHOOK_URL`.
-3. Add an action after it — **Email by Zapier** or **Gmail → Send Email**. Send To: `staff_email`, and include `link` and `pin` in the body (e.g. "Your PIN: {{pin}}").
-4. Test by clicking **Send availability request** in the app.
+### What gets sent, and when
 
-This is optional — the link still works fine without it, you'd just copy/paste it yourself instead of one-click emailing everyone.
+| Email | Goes to | Triggered by |
+| --- | --- | --- |
+| Availability request | each staff member, with their own PIN | **Send availability request** on the Availability page |
+| Availability reopened | one staff member | **Reopen** on their row |
+| Availability reminder | staff who haven't responded | automatically, ~24h before the deadline |
+| Deadline missed | the studio | automatically, once a deadline passes with people still outstanding |
+| Someone submitted | the studio | a staff member submitting through their link |
+| Everyone's submitted | the studio | the last active staff member submitting |
+| Schedule confirmed | each assigned staff member | **Approve schedule** on the Schedule page |
+
+The wording of all seven lives in `src/lib/emails.ts` and is unit tested — what a staff member receives is what's in that file.
+
+### Why not Zapier
+
+These used to go through Zapier catch hooks. A webhook POST can only confirm that *Zapier accepted the handoff*, which is not the same as an email existing: a real send in this system got a `2xx` back and never became a Zapier task (2026-08-07), and nothing surfaced it for weeks. Gmail's API answers the actual question, so every button now reports what really happened and names anyone who didn't get theirs.
+
+The `ZAPIER_*` webhook variables for outgoing email are no longer used and can be deleted. `ZAPIER_WEBHOOK_SECRET` is unrelated and still needed — that's the *incoming* Pixifi booking import.
+
+## The automatic reminder + missed-deadline check
+
+When you click **Send availability request** you also set a "Respond by" date and time. From then on, without you doing anything:
+
+- Anyone who hasn't responded gets one reminder email, about 24 hours before that deadline — once per person, per month.
+- Once the deadline passes, if anyone is still outstanding, you get an email naming them. Silent if everyone's in.
+
+This runs on a schedule rather than off a button, so it needs two things set up once:
+
+1. **A cron secret** — generate any random value and set it as `CRON_SECRET` on the project.
+2. **Vercel Cron** — this repo's `vercel.json` already defines a daily job hitting `/api/cron/availability-reminders` (Vercel's free Hobby plan only allows once-a-day schedules). After deploying, open the project in Vercel → **Settings → Cron Jobs** and confirm it's listed and switched on.
+
+The emails themselves are sent by the app through your Gmail — there's no Zap involved.
+
+Test it without waiting a day by setting a link's deadline to ~12 hours out and calling the route directly with the `Authorization: Bearer <CRON_SECRET>` header. The response tells you how many reminders went out and names anyone Gmail refused.
 
 ## Letting someone redo their availability after they've submitted
 
 Submitting locks a staff member out of changing their own answers for that month. If their availability changes afterwards, their row on the Availability response tracker shows **Submitted** with a **Reopen** button next to it.
 
-Reopen does two things: it unlocks them for that month, and it emails them the link plus their PIN again (the same email "Send availability request" sends — no extra Zap to set up). When they open it, their existing dates come up already ticked and their note is still there, so they only change what actually moved. It asks you to confirm first, since it sends real email, and it's logged under "Already sent this month" so another owner can see it happened.
+Reopen unlocks them for that month and emails them the link plus their PIN again. When they open it, their existing dates come up already ticked and their note is still there, so they only change what actually moved. It asks you to confirm first, since it sends real email, and it's logged under "Already sent this month" so another owner can see it happened.
 
-It deliberately leaves the month's "respond by" deadline and reminder settings alone — reopening one person isn't a new request cycle, and changing them would affect everyone else's reminders too.
+It deliberately leaves the month's "respond by" deadline and reminder settings alone — reopening one person isn't a new request cycle, and changing those would affect everyone else too.
 
-If email isn't set up, there's no address on file for them, or the send fails, they're still reopened and the page tells you to send them the link yourself.
-
-## Optional: notify the studio when staff respond
-
-Two more Zaps, both fired from the staff-facing availability link (not the owner Availability page):
-
-1. **One staff member submitted** — fires every time anyone submits.
-2. **Everyone's submitted** — fires once, the moment every active staff member has responded for that month.
-
-1. In Zapier, create a Zap for each: trigger = **Webhooks by Zapier → Catch Hook**. Set the webhook URLs as `ZAPIER_STAFF_SUBMITTED_WEBHOOK_URL` and `ZAPIER_ALL_SUBMITTED_WEBHOOK_URL`.
-2. Add an action after each — **Email by Zapier** or **Gmail → Send Email** — to `hello@sandboxphotographers.com`. Use `staff_name` / `month_label` / `link` (a direct link to that month's Availability Tracker — make it a clickable link in the email body) in the first, and just `month_label` in the second.
-3. Test by submitting availability as a staff member through the public link.
-
-Both are optional independently — leave either env var unset to skip that notification.
-
-## Optional: 24-hour reminder for staff who haven't responded
-
-When you click **Send availability request**, you now also set a "Respond by" date/time. If someone hasn't submitted by about 24 hours before that deadline, this reminds them automatically — one email, once, per person, per month.
-
-This one needs two things instead of just a Zap, since it runs on a schedule rather than off a button click:
-
-1. **A cron secret** — generate a random value and set it as `CRON_SECRET`.
-2. **Vercel Cron** — this repo's `vercel.json` already defines a daily cron hitting `/api/cron/availability-reminders` (Vercel's free Hobby plan only allows once-a-day schedules, not hourly). After deploying, open your project in the Vercel dashboard → **Settings → Cron Jobs** and confirm it shows up and is turned on.
-3. **The Zap** — same pattern as "Send availability request" above: trigger = **Webhooks by Zapier → Catch Hook**, set its URL as `ZAPIER_AVAILABILITY_REMINDER_WEBHOOK_URL`, then an **Email by Zapier**/**Gmail** action to `staff_email` using `link`, `pin`, and `deadline_label` in the body. Add `hello@sandboxphotographers.com` as a **CC** on this action so the studio sees every reminder that goes out.
-4. Test without waiting a full day: set a test link's deadline to ~12 hours out, then hit the route directly —
-   ```bash
-   curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://your-deployed-domain.com/api/cron/availability-reminders
-   ```
-   It responds with how many links it looked at and how many reminders/notices it sent.
-
-This is optional — without `CRON_SECRET` set, the route just returns 401 and nothing fires.
+If there's no email address on file for them or Gmail refuses the send, they're still reopened and the page tells you to send them the link yourself.
 
 Note that **"Send availability request" always sets the deadline for the whole month**, even when you use "Choose who" to send to one person — the deadline belongs to the month's link, not to a person. Everyone the app has asked that month keeps their automatic reminder either way; sending to one extra person adds them to the list rather than replacing it.
-
-## Optional: notify the studio if anyone missed the deadline
-
-Same cron job as above, run once more when a deadline actually passes: if any active staff member still hasn't submitted, this emails the studio a list of who's missing. Stays silent if everyone got their availability in by the deadline (no separate "all clear" email — you'd already know from the "everyone's submitted" notification above).
-
-1. In Zapier, create a Zap: trigger = **Webhooks by Zapier → Catch Hook**. Set its URL as `ZAPIER_DEADLINE_MISSED_WEBHOOK_URL`.
-2. Add an action — **Email by Zapier**/**Gmail** — to `hello@sandboxphotographers.com`. Use `month_label`, `deadline_label`, and `missing_names` (a comma-separated list) or `missing_count` in the body.
-3. Test the same way as the reminder job above — hit `/api/cron/availability-reminders` with `CRON_SECRET` against a test link whose deadline is already in the past.
-
-This is optional — leave `ZAPIER_DEADLINE_MISSED_WEBHOOK_URL` unset to skip it.
 
 ## Optional: check Pixifi against this month's Jobs before sending availability requests
 
@@ -175,20 +162,16 @@ Leave it unset to skip this — the button will show "no feed configured, nothin
 
 - **Jobs** — book a school job, paste in its Picture Days (date + setups per line, or leave setups off a line if unknown — it's flagged "needs review" until you confirm it). Category is just `Preschool`/`K-12` for staff matching; a separate "school type" field (TK-8, Pre-8, High School, etc.) and enrollment (number of students) are there purely for your reference. Flag a day as outdoor, "+ group photo", or "babies" as needed (babies-flagged days only offer Babies Photography-qualified staff for the Photographer slot). "Saved schools" is collapsed by default — click to expand, search by name, edit a school's name/address/mileage (only saves when you click Save, not on blur), or remove one you no longer need (safe any time — an existing job's own data is untouched, it only clears that job's shortcut link). Browse other months with the month picker at the top.
 - **Staff** — your roster: roles (Photographer/Assistant/Supervisor), which categories/specialties they're cleared for, booking priority (1-5, higher gets booked first — set it low for anyone who should be booked last regardless of actual tenure), and home city/email. "Sync distances" looks up real staff-to-school distances for ranking (see above). Deactivated staff (e.g. someone who's left) are hidden from the roster by default — use "Show inactive" above the table to bring them back into view or reactivate them, and are never offered as a candidate for a new assignment while inactive.
-- **Availability** — click "Generate this month's link" and send that single link to staff yourself (text/email), or use "Send availability request" to email people individually with their own PIN, after setting a "Respond by" deadline (see below). The pink "Check Pixifi" button right above Send compares this month's Jobs against Pixifi's own calendar feed and flags any mismatch in-app before you notify staff (see "Optional: check Pixifi" above) — the Send button's confirmation also reminds you to run it first. Defaults to everyone active; click "Choose who" to narrow it to specific people instead — e.g. a staff member added mid-month (no need to re-notify everyone who's already responded), or re-flagging a last-minute new date to just the people you want to ask about it. **This sends real email with no undo** — it always asks you to confirm exactly who and what deadline first, and reports back clearly whether it actually sent (green) or nothing went out because no Zap is configured yet (amber warning) — never assume a click went through silently either way. Every send is also logged (who sent it, when, and to whom) right above the Send button, so if you and Julia or Steph both have owner logins, whoever goes to send next can see it's already been done this month before sending again. On the link, staff pick their name and enter their own PIN before they see anything — they can only view/edit their own answers, never anyone else's. They tap their available dates and can leave a free-text note (scheduling preference, a hard-out time, etc.) — purely informational, shown to you in the response tracker alongside their actual dates. Submitting locks it (they can't come back and change it themselves); you can still adjust it directly from the response tracker if something changes — each click asks you to confirm the person, date, and new status first, since it's easy to tap the wrong one while scanning the table. Inactive staff never appear on the link or in the response tracker.
+- **Availability** — click "Generate this month's link" and send that single link to staff yourself (text/email), or use "Send availability request" to email people individually with their own PIN, after setting a "Respond by" deadline (see below). The pink "Check Pixifi" button right above Send compares this month's Jobs against Pixifi's own calendar feed and flags any mismatch in-app before you notify staff (see "Optional: check Pixifi" above) — the Send button's confirmation also reminds you to run it first. Defaults to everyone active; click "Choose who" to narrow it to specific people instead — e.g. a staff member added mid-month (no need to re-notify everyone who's already responded), or re-flagging a last-minute new date to just the people you want to ask about it. **This sends real email with no undo** — it always asks you to confirm exactly who and what deadline first, and reports back exactly how many emails Gmail actually accepted and names anyone who didn't get one (green when everything went, amber when something didn't) — never assume a click went through silently either way. Copies land in your own Gmail Sent folder, which is independent proof. Every send is also logged (who sent it, when, and to whom) right above the Send button, so if you and Julia or Steph both have owner logins, whoever goes to send next can see it's already been done this month before sending again. On the link, staff pick their name and enter their own PIN before they see anything — they can only view/edit their own answers, never anyone else's. They tap their available dates and can leave a free-text note (scheduling preference, a hard-out time, etc.) — purely informational, shown to you in the response tracker alongside their actual dates. Submitting locks it (they can't come back and change it themselves) — their row then shows **Submitted** with a **Reopen** button that unlocks them and re-sends their link if their availability changes. You can also still adjust it directly from the response tracker — each click asks you to confirm the person, date, and new status first, since it's easy to tap the wrong one while scanning the table. Inactive staff never appear on the link or in the response tracker.
 - **Trainee** — check "Trainee?" on a Picture Day (Jobs page) to add one supplemental Trainee slot. Unlike the other roles, any active staff member is eligible — no separate tagging needed.
 - **Schedule** — "Generate schedule" auto-assigns every role slot by priority → category/specialty match → distance from the job, respecting who's marked available. Any slot's dropdown shows every qualified person, available or not, grouped accordingly — so a last-minute swap is always possible even if it wasn't planned for. Unfilled slots are flagged rather than left blank.
   - **List** view for editing, **Calendar** view (Month or Week, Monday-start) to see everything at a glance — click a day to jump back to the editable list.
   - **By Staff** view shows each person's assigned dates/roles/schools for the month, with a CSV export.
-  - **Approve schedule** marks the month final and (if the optional Zapier email hookup below is configured) emails each staff member their confirmed dates.
+  - **Approve schedule** marks the month final and emails each staff member their confirmed dates through your Gmail, reporting who actually received one.
 - **Payroll** — pick a date range and see round-trip miles × $0.75/mile per person, based on who's actually on the finalized schedule. Export as CSV for payroll.
 - **Print weekly sheet** — from the Schedule page, opens a clean, plain page grouped by week for prepping gear, including outdoor/group-photo notes.
 
 The crew rule, mileage rate, and studio address are defined once in [`src/lib/types.ts`](src/lib/types.ts) if they ever need to change.
-
-## Known Zapier gotcha: signature renders as plain text
-
-If a Gmail send action's signature comes through with broken formatting — links showing as plain unclickable text, or lines running together with no spacing — check that Zap step's **"Render signature in HTML"** field. It defaults to **False**, which flattens your real Gmail signature (links, line breaks) down to plain text. Set it to **True**. This is a per-Zap setting, not global — check it on every Zap in this app that sends via a Gmail action, not just the one you noticed it on.
 
 ## Not built in v1 (by design)
 

@@ -3,7 +3,13 @@
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { monthLabel } from "@/lib/month";
-import { postWebhook } from "@/lib/webhook";
+import { sendGmailMessage } from "@/lib/gmail";
+import { allSubmittedEmail, staffSubmittedEmail } from "@/lib/emails";
+
+// The studio's own inbox. Sending from Adi's Gmail to Adi's Gmail is
+// deliberate — it threads with everything else about that month and keeps
+// one place to look, which a Zapier-side "notify me" step never did.
+const STUDIO_EMAIL = "hello@sandboxphotographers.com";
 
 export type UnlockResult = { error?: string; existing?: string[]; note?: string };
 
@@ -74,13 +80,13 @@ async function notifyOwners(result: SubmitResult, staffId: string) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const trackerLink = `${siteUrl}/availability-tracker?month=${month}#staff-${staffId}`;
 
-  const submittedWebhook = process.env.ZAPIER_STAFF_SUBMITTED_WEBHOOK_URL;
-  if (submittedWebhook) {
-    await postWebhook("staff-submitted", submittedWebhook, { staff_name: result.staff_name, month, month_label: monthLbl, link: trackerLink });
-  }
+  // Both go to the studio's own address — these are the app telling Adi
+  // something happened, not staff-facing mail.
+  const submitted = staffSubmittedEmail({ staffName: result.staff_name!, monthLabel: monthLbl, trackerLink });
+  await sendGmailMessage({ to: STUDIO_EMAIL, subject: submitted.subject, htmlBody: submitted.htmlBody });
 
-  const allSubmittedWebhook = process.env.ZAPIER_ALL_SUBMITTED_WEBHOOK_URL;
-  if (result.all_submitted && allSubmittedWebhook) {
-    await postWebhook("all-submitted", allSubmittedWebhook, { month, month_label: monthLbl });
+  if (result.all_submitted) {
+    const all = allSubmittedEmail({ monthLabel: monthLbl, trackerLink });
+    await sendGmailMessage({ to: STUDIO_EMAIL, subject: all.subject, htmlBody: all.htmlBody });
   }
 }

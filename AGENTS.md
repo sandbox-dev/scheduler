@@ -47,6 +47,19 @@ The exclusivity in §4 (`usedPerDate`) only applies during auto-generation. Manu
 
 A locked job's Schedule slots become read-only (`ScheduleSlotCard`'s `locked` prop disables the picker) and **Regenerate skips it entirely** — `generateAndSaveSchedule()` filters `!j.locked` before generating, so a locked job's `schedule_assignments` are never touched by a regenerate of the rest of the month. Approving a month (§7) auto-locks every job with a Picture Day in it; locking/unlocking itself never sends any email (that's a separate, explicit action from Approve).
 
+## 6b. All outgoing email goes through Gmail, not Zapier (`src/lib/gmail.ts`, `src/lib/emails.ts`)
+
+Every email this app sends — availability request, reopen, 24h reminder, deadline-missed notice, staff-submitted, all-submitted, schedule-approved — is sent by `sendGmailMessage()` straight to the Gmail API, using the studio's own connected account. `src/lib/webhook.ts`/`postWebhook()` is **gone**; do not reintroduce a webhook relay for outgoing mail.
+
+Why it changed (2026-08-24): a webhook POST can only confirm *Zapier accepted the handoff*, never that an email exists. A real send got a 2xx and never became a Zapier task (2026-08-07) and went unnoticed for weeks; the UI meanwhile reported "sent". Gmail's API answers the real question, so every caller now reports per-person truth (`sent` / `skippedNoEmail` / `failed`) and names anyone who missed out instead of returning a bare count plus a `webhookConfigured` flag.
+
+Notable specifics:
+- **No "Connect Gmail" screen in this app.** Both apps point at the SAME Supabase project, so `getStoredRefreshToken()` reads `tb_app_settings.google_refresh_token` — the row timeline-builder's OAuth flow wrote. One connection, and reconnecting there fixes both. Requires `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` on this project too; Vercel marks both Sensitive, so they cannot be copied between projects via `vercel env pull` (it returns the literal string `[SENSITIVE]`) — they must be pasted from Google Cloud Console.
+- **Service-role client, not the cookie one** — the reminder cron and the staff-facing submit action send with no logged-in owner session, and `tb_app_settings`' RLS only grants reads to `authenticated`. Same trap timeline-builder hit with its school-facing sends.
+- **`sendGmailMessage()` never throws.** Callers loop over people; one bad address must not abort the batch.
+- **Email wording lives in `src/lib/emails.ts`** and is unit tested, including HTML-escaping of staff/school names (owner-typed free text). What a staff member receives is what's in that file — not a Zap step nobody can review.
+- `ZAPIER_WEBHOOK_SECRET` is unrelated and still live: that's the *incoming* Pixifi booking import (§9).
+
 ## 7. Approving a month + emailing staff (`approveSchedule()`, `src/app/(owner)/schedule/actions.ts`)
 
 Upserts a `schedule_approvals` row for the month, locks every job in it (§6), then — only if `ZAPIER_SCHEDULE_WEBHOOK_URL` is configured — POSTs one payload per staff member who has any assignment that month (name, email, a `days[]` array, and a pre-joined `summary` string) to Zapier, which sends the actual "Schedule Approved" email. **Silently skips anyone with no email on file** (collected in `skippedNoEmail`, shown back to the caller) — the Staff page needs a real email address per person for this to reach them. Safe to click again after edits; it just re-notifies everyone currently assigned, it doesn't fail on already-approved months (`upsert ... onConflict: "month"`).

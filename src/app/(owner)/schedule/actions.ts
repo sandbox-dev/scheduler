@@ -6,7 +6,8 @@ import { getAvailability, getJobs, getSchools, getScheduleAssignments, getStaff,
 import { assignEquipmentCases, buildStaffScheduleRows, fmtDate, generateSchedule, neededDatesSummary } from "@/lib/scheduling";
 import { monthLabel } from "@/lib/month";
 import { ROLES, type Role } from "@/lib/types";
-import { postWebhook } from "@/lib/webhook";
+import { sendGmailMessage } from "@/lib/gmail";
+import { scheduleApprovedEmail } from "@/lib/emails";
 
 // Scoped to a single month and skips locked jobs entirely — their
 // schedule_assignments are left untouched so a lock actually protects a
@@ -109,7 +110,7 @@ export async function setAssignmentCase(assignmentId: string, jobId: string, equ
   revalidatePath("/schedule");
 }
 
-export type ApproveScheduleResult = { emailed: number; skippedNoEmail: string[]; webhookConfigured: boolean };
+export type ApproveScheduleResult = { emailed: number; skippedNoEmail: string[]; failed: string[] };
 
 // Addresses are stored as one free-text line (e.g. "123 Main St, Oakland, CA
 // 94602"); city is the second-to-last comma-separated segment, before the
@@ -131,8 +132,6 @@ export async function approveSchedule(month: string): Promise<ApproveScheduleRes
     .upsert({ month, approved_at: new Date().toISOString() }, { onConflict: "month" });
   if (approvalError) throw new Error("Couldn't mark the schedule approved — please try again.");
 
-  const webhookUrl = process.env.ZAPIER_SCHEDULE_WEBHOOK_URL;
-  const webhookConfigured = !!webhookUrl;
 
   const [jobs, staff, assignments, schools] = await Promise.all([
     getJobs(),
@@ -161,39 +160,31 @@ export async function approveSchedule(month: string): Promise<ApproveScheduleRes
   const rowsByStaffId = buildStaffScheduleRows(needed, assignmentsByDay, schoolAddressById);
 
   const skippedNoEmail: string[] = [];
+  const failed: string[] = [];
   let emailed = 0;
 
-  if (webhookConfigured) {
-    for (const s of staff) {
-      const rows = rowsByStaffId.get(s.id) || [];
-      if (rows.length === 0) continue;
-      if (!s.email.trim()) {
-        skippedNoEmail.push(s.name);
-        continue;
-      }
-
-      const ok = await postWebhook("schedule-approved", webhookUrl!, {
-        staff_name: s.name,
-        staff_email: s.email,
-        month,
-        month_label: monthLabel(month),
-        days: rows.map((r) => {
-          const { wd, md } = fmtDate(r.date);
-          return { date: `${wd} ${md}`, role: r.role, school: r.jobName, address: r.address, city: cityFromAddress(r.address) };
-        }),
-        summary: rows
-          .map((r) => {
-            const { wd, md } = fmtDate(r.date);
-            const city = cityFromAddress(r.address);
-            return `${wd} ${md} — ${r.role} at ${r.jobName}${city ? ` (${city})` : ""}`;
-          })
-          .join("\n"),
-      });
-      if (ok) emailed++;
+  for (const s of staff) {
+    const rows = rowsByStaffId.get(s.id) || [];
+    if (rows.length === 0) continue;
+    if (!s.email.trim()) {
+      skippedNoEmail.push(s.name);
+      continue;
     }
+
+    const { subject, htmlBody } = scheduleApprovedEmail({
+      staffName: s.name,
+      monthLabel: monthLabel(month),
+      days: rows.map((r) => {
+        const { wd, md } = fmtDate(r.date);
+        return { date: `${wd} ${md}`, role: r.role, school: r.jobName, city: cityFromAddress(r.address) };
+      }),
+    });
+    const result = await sendGmailMessage({ to: s.email, subject, htmlBody });
+    if (result.ok) emailed++;
+    else failed.push(s.name);
   }
 
   revalidatePath("/schedule");
   revalidatePath("/jobs");
-  return { emailed, skippedNoEmail, webhookConfigured };
+  return { emailed, skippedNoEmail, failed };
 }
