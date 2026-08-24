@@ -27,10 +27,17 @@ describe("escapeHtml", () => {
 });
 
 describe("availabilityRequestEmail", () => {
+  it("greets by first name only, not the full name on the staff record", () => {
+    // Staff are stored as full names; the email should still read "Hi Sarah,".
+    const { htmlBody } = availabilityRequestEmail(BASE);
+    expect(htmlBody).toContain("Hi Sarah,");
+    expect(htmlBody).not.toContain("Hi Sarah Chen,");
+  });
+
   it("carries the person's own PIN, their link and the deadline", () => {
-    const { subject, htmlBody } = availabilityRequestEmail(BASE);
+    const { subject } = availabilityRequestEmail(BASE);
+    const { htmlBody } = availabilityRequestEmail(BASE);
     expect(subject).toBe("Your September 2026 Picture Day availability");
-    expect(htmlBody).toContain("Sarah Chen");
     expect(htmlBody).toContain("4417");
     expect(htmlBody).toContain(BASE.link);
     expect(htmlBody).toContain("September 1, 2026 at 5:00 PM");
