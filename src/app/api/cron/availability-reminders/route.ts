@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { monthLabel } from "@/lib/month";
-import { postWebhook } from "@/lib/webhook";
+import { sendGmailMessage } from "@/lib/gmail";
+import { availabilityReminderEmail, deadlineMissedEmail } from "@/lib/emails";
 
 type SupabaseClient = ReturnType<typeof createServiceRoleClient>;
 
@@ -27,6 +28,8 @@ async function getPendingStaff(supabase: SupabaseClient, month: string, staffIds
   const submittedIds = new Set((submissions ?? []).map((s) => s.staff_id));
   return (staff ?? []).filter((s) => !submittedIds.has(s.id));
 }
+
+const STUDIO_EMAIL = "hello@sandboxphotographers.com";
 
 function formatDeadline(deadlineAt: string) {
   return new Date(deadlineAt).toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" });
@@ -54,8 +57,6 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServiceRoleClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const reminderWebhook = process.env.ZAPIER_AVAILABILITY_REMINDER_WEBHOOK_URL;
-  const deadlineMissedWebhook = process.env.ZAPIER_DEADLINE_MISSED_WEBHOOK_URL;
 
   const now = new Date();
   // A bit wider than a strict 24h, since this only ticks once a day — the
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
   const lookahead = new Date(now.getTime() + 26 * 60 * 60 * 1000);
 
   let remindersSent = 0;
+  const remindersFailed: string[] = [];
   let deadlineNoticesSent = 0;
 
   // ---------- Job 1: remind staff whose deadline is coming up ----------
@@ -82,26 +84,24 @@ export async function GET(request: NextRequest) {
   for (const link of upcomingLinks ?? []) {
     const pending = await getPendingStaff(supabase, link.month, link.staff_ids);
 
-    if (reminderWebhook) {
-      for (const s of pending) {
-        if (!s.email?.trim()) continue;
-        const ok = await postWebhook("availability-reminder", reminderWebhook, {
-          staff_name: s.name,
-          staff_email: s.email,
-          month: link.month,
-          month_label: monthLabel(link.month),
-          link: `${siteUrl}/availability/${link.token}`,
-          pin: s.pin,
-          deadline: link.deadline_at,
-          deadline_label: formatDeadline(link.deadline_at as string),
-        });
-        if (ok) remindersSent++;
-      }
+    for (const s of pending) {
+      if (!s.email?.trim()) continue;
+      const { subject, htmlBody } = availabilityReminderEmail({
+        staffName: s.name,
+        monthLabel: monthLabel(link.month),
+        link: `${siteUrl}/availability/${link.token}`,
+        pin: s.pin,
+        deadlineLabel: formatDeadline(link.deadline_at as string),
+      });
+      const result = await sendGmailMessage({ to: s.email, subject, htmlBody });
+      if (result.ok) remindersSent++;
+      else remindersFailed.push(s.name);
     }
 
-    // Mark the batch as sent even if the webhook isn't configured — same
-    // "silently no-op without this env var" convention as every other
-    // optional Zapier hookup in this app.
+    // Marked regardless of whether every individual send succeeded — this is
+    // a once-daily job, and re-arming it would re-remind everyone who DID get
+    // theirs. Failures are surfaced in the response body instead (and logged
+    // by sendGmailMessage) rather than retried blindly.
     await supabase
       .from("availability_links")
       .update({ reminder_sent_at: new Date().toISOString() })
@@ -123,20 +123,18 @@ export async function GET(request: NextRequest) {
   for (const link of passedLinks ?? []) {
     const pending = await getPendingStaff(supabase, link.month, link.staff_ids);
 
-    if (pending.length > 0 && deadlineMissedWebhook) {
-      const ok = await postWebhook("deadline-missed", deadlineMissedWebhook, {
-        month: link.month,
-        month_label: monthLabel(link.month),
-        deadline_label: formatDeadline(link.deadline_at as string),
-        missing_count: pending.length,
-        missing_names: pending.map((s) => s.name).join(", "),
+    if (pending.length > 0) {
+      const { subject, htmlBody } = deadlineMissedEmail({
+        monthLabel: monthLabel(link.month),
+        deadlineLabel: formatDeadline(link.deadline_at as string),
+        missingNames: pending.map((s) => s.name),
       });
-      if (ok) deadlineNoticesSent++;
+      const result = await sendGmailMessage({ to: STUDIO_EMAIL, subject, htmlBody });
+      if (result.ok) deadlineNoticesSent++;
     }
 
-    // Marked regardless of whether anyone was missing or the webhook is
-    // configured — once a deadline has passed there's nothing more to check
-    // for that link either way.
+    // Marked regardless of whether anyone was missing — once a deadline has
+    // passed there's nothing more to check for that link either way.
     await supabase
       .from("availability_links")
       .update({ deadline_notice_sent_at: new Date().toISOString() })
@@ -146,9 +144,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     upcomingLinksProcessed: upcomingLinks?.length ?? 0,
     remindersSent,
-    reminderWebhookConfigured: !!reminderWebhook,
+    remindersFailed,
     passedLinksProcessed: passedLinks?.length ?? 0,
     deadlineNoticesSent,
-    deadlineMissedWebhookConfigured: !!deadlineMissedWebhook,
   });
 }

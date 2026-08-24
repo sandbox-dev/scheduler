@@ -7,10 +7,14 @@ import { getActiveAvailabilityLinkForMonth, getJobs, getStaff } from "@/lib/data
 import { flattenJobDays } from "@/lib/scheduling";
 import { monthLabel } from "@/lib/month";
 import { parseIcsEvents, reconcile, isSchoolPictureDayEvent, type ReconciliationResult } from "@/lib/pixifi";
-import { postWebhook } from "@/lib/webhook";
+import { sendGmailMessage } from "@/lib/gmail";
+import { availabilityRequestEmail, testEmail } from "@/lib/emails";
 import { linkHasBeenSent, mergeAskedStaffIds } from "@/lib/availability";
 
 const LINK_LIFETIME_DAYS = 45;
+
+// The studio's own inbox — the only address the test email can ever reach.
+const STUDIO_EMAIL = "hello@sandboxphotographers.com";
 
 export async function createAvailabilityLink(month: string) {
   const token = randomBytes(16).toString("hex");
@@ -43,7 +47,12 @@ export async function setStaffAvailability(staffId: string, pictureDayId: string
   revalidatePath("/schedule");
 }
 
-export type SendAvailabilityRequestsResult = { sent: number; skippedNoEmail: string[]; webhookConfigured: boolean };
+export type SendAvailabilityRequestsResult = {
+  sent: number;
+  skippedNoEmail: string[];
+  failed: string[];
+  sentTo: string[];
+};
 
 // One click instead of texting/emailing everyone individually — fires one
 // notification per active staff member (via a Zapier webhook, same pattern
@@ -94,50 +103,47 @@ export async function sendAvailabilityRequests(
     .eq("token", token);
   revalidatePath("/availability-tracker");
 
-  const webhookUrl = process.env.ZAPIER_AVAILABILITY_WEBHOOK_URL;
-  const webhookConfigured = !!webhookUrl;
-
   // staffIds narrows to specific people (e.g. a staff member added mid-month,
   // or re-flagging a last-minute date to a few people) — omit it to send to
   // everyone active, same as before this option existed.
   const targetIds = staffIds ? new Set(staffIds) : null;
   const staff = (await getStaff()).filter((s) => !targetIds || targetIds.has(s.id));
   const skippedNoEmail: string[] = [];
+  const failed: string[] = [];
   const sentToNames: string[] = [];
-  let sent = 0;
   const deadlineLabel = new Date(deadlineAt).toLocaleString(undefined, {
     dateStyle: "long",
     timeStyle: "short",
   });
 
-  if (webhookConfigured) {
-    for (const s of staff) {
-      if (!s.active) continue;
-      if (!s.email.trim()) {
-        skippedNoEmail.push(s.name);
-        continue;
-      }
-      const ok = await postWebhook("availability-request", webhookUrl!, {
-        staff_name: s.name,
-        staff_email: s.email,
-        month,
-        month_label: monthLabel(month),
-        link: linkUrl,
-        pin: s.pin,
-        deadline: deadlineAt,
-        deadline_label: deadlineLabel,
-      });
-      if (ok) {
-        sent++;
-        sentToNames.push(s.name);
-      }
+  for (const s of staff) {
+    if (!s.active) continue;
+    if (!s.email.trim()) {
+      skippedNoEmail.push(s.name);
+      continue;
     }
+    const { subject, htmlBody } = availabilityRequestEmail({
+      staffName: s.name,
+      monthLabel: monthLabel(month),
+      link: linkUrl,
+      pin: s.pin,
+      deadlineLabel,
+    });
+    // One send per person rather than one message with everyone on it —
+    // each email carries that person's own PIN and nobody else's.
+    const result = await sendGmailMessage({ to: s.email, subject, htmlBody });
+    if (result.ok) sentToNames.push(s.name);
+    else failed.push(s.name);
+  }
 
-    // Logged so a second owner login (Adi/Julia/Steph all share full owner
-    // access with no other way to tell) can see this month's request has
-    // already gone out before sending it again. Append-only on purpose — a
-    // follow-up send to a few specific people stays visible as its own row
-    // alongside the original send-to-everyone, not merged/overwritten.
+  // Logged so a second owner login (Adi/Julia/Steph all share full owner
+  // access with no other way to tell) can see this month's request has
+  // already gone out before sending it again. Append-only on purpose — a
+  // follow-up send to a few specific people stays visible as its own row
+  // alongside the original send-to-everyone, not merged/overwritten.
+  // Only records who actually received one, so the log stays evidence of
+  // real emails rather than of attempts.
+  if (sentToNames.length > 0) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -146,10 +152,10 @@ export async function sendAvailabilityRequests(
       sent_by: user?.email || "unknown",
       recipient_names: sentToNames,
     });
-    revalidatePath("/availability-tracker");
   }
+  revalidatePath("/availability-tracker");
 
-  return { sent, skippedNoEmail, webhookConfigured };
+  return { sent: sentToNames.length, skippedNoEmail, failed, sentTo: sentToNames };
 }
 
 export type PixifiCheckResult = { configured: false } | ({ configured: true } & ReconciliationResult);
@@ -184,7 +190,7 @@ export async function checkPixifiReconciliation(month: string): Promise<PixifiCh
 export type ReopenResult = {
   staffName: string;
   emailed: boolean;
-  reason?: "no_webhook" | "no_email" | "no_link" | "send_failed";
+  reason?: "no_email" | "no_link" | "send_failed";
   deadlineLabel: string | null;
 };
 
@@ -237,30 +243,28 @@ export async function reopenStaffAvailability(month: string, staffId: string): P
   // stands on its own — if the email can't go out, say which reason rather
   // than failing the whole action, so the owner knows to text them the link
   // instead of being left unsure whether they were reopened at all.
-  const webhookUrl = process.env.ZAPIER_AVAILABILITY_WEBHOOK_URL;
-  if (!webhookUrl) return { staffName, emailed: false, reason: "no_webhook", deadlineLabel };
   if (!link) return { staffName, emailed: false, reason: "no_link", deadlineLabel };
   if (!String(staffRow.email ?? "").trim()) return { staffName, emailed: false, reason: "no_email", deadlineLabel };
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  // Reuses the existing "Send availability request" Zap rather than needing
-  // a new one set up — same payload shape, so the same email template just
-  // goes out again to one person.
-  const ok = await postWebhook("availability-request", webhookUrl, {
-    staff_name: staffName,
-    staff_email: staffRow.email,
-    month,
-    month_label: monthLabel(month),
+  // Same email as a normal request, with `reopened` flipping the wording so
+  // it reads as "update this" rather than arriving as an unexplained
+  // duplicate of a request they've already answered.
+  const { subject, htmlBody } = availabilityRequestEmail({
+    staffName,
+    monthLabel: monthLabel(month),
     link: `${siteUrl}/availability/${link.token}`,
-    pin: staffRow.pin,
-    deadline: link.deadline_at ?? "",
-    deadline_label: deadlineLabel ?? "as soon as possible",
+    pin: staffRow.pin as string,
+    deadlineLabel,
+    reopened: true,
   });
-  if (!ok) return { staffName, emailed: false, reason: "send_failed", deadlineLabel };
+  const result = await sendGmailMessage({ to: staffRow.email as string, subject, htmlBody });
+  if (!result.ok) return { staffName, emailed: false, reason: "send_failed", deadlineLabel };
 
   // Logged the same way a normal send is, so the "Already sent this month"
   // panel shows a reopen alongside the original request instead of an email
-  // going out with no trace of it on the page.
+  // going out with no trace of it on the page. Only reached once Gmail has
+  // confirmed the send, so the log never claims an email that didn't happen.
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -272,4 +276,19 @@ export async function reopenStaffAvailability(month: string, staffId: string): P
   revalidatePath("/availability-tracker");
 
   return { staffName, emailed: true, deadlineLabel };
+}
+
+export type TestEmailResult = { ok: boolean; sentTo?: string; error?: string };
+
+// Sends one email to the studio's own address and nowhere else, so the email
+// connection can be checked without emailing a staff member to find out.
+//
+// Adi's question that prompted the whole move off Zapier was "I have no way
+// of knowing if the email sent" — a button that proves the chain end to end,
+// on demand, is the durable answer to that. Safe to press at any time: the
+// recipient is hardcoded, so it can never reach staff or a school.
+export async function sendTestEmail(): Promise<TestEmailResult> {
+  const { subject, htmlBody } = testEmail();
+  const result = await sendGmailMessage({ to: STUDIO_EMAIL, subject, htmlBody });
+  return result.ok ? { ok: true, sentTo: STUDIO_EMAIL } : { ok: false, error: result.error };
 }

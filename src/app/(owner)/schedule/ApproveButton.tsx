@@ -20,18 +20,21 @@ export function ApproveButton({ month, approvedAt }: { month: string; approvedAt
           startTransition(async () => {
             try {
               const result = await approveSchedule(month);
-              if (!result.webhookConfigured) {
-                setMessage("Marked approved. (No notification webhook configured yet — see README to set one up.)");
-              } else {
-                const notes: string[] = [];
-                if (result.skippedNoEmail.length > 0) {
-                  notes.push(`no email on file for: ${result.skippedNoEmail.join(", ")}`);
-                }
-                setMessage(
-                  `Marked approved. Notified ${result.emailed} staff member${result.emailed === 1 ? "" : "s"}.` +
-                    (notes.length > 0 ? ` Skipped — ${notes.join("; ")}.` : "")
-                );
+              // Names anyone who didn't get theirs rather than reporting a
+              // bare count — the count alone can't tell you a send failed.
+              const notes: string[] = [];
+              if (result.skippedNoEmail.length > 0) {
+                notes.push(`no email address on file for ${result.skippedNoEmail.join(", ")}`);
               }
+              if (result.failed.length > 0) {
+                notes.push(`Gmail wouldn't send to ${result.failed.join(", ")} — tell them another way`);
+              }
+              setMessage(
+                `Marked approved. Emailed ${result.emailed} staff member${result.emailed === 1 ? "" : "s"} their dates` +
+                  (result.emailed > 0 ? " (copies are in your Gmail Sent folder)" : "") +
+                  "." +
+                  (notes.length > 0 ? ` Didn't go out — ${notes.join("; ")}.` : "")
+              );
             } catch {
               setError("Couldn't approve the schedule — please try again.");
             }

@@ -5,10 +5,9 @@ import { AlertTriangle, CheckCircle2, RotateCcw } from "lucide-react";
 import { reopenStaffAvailability, type ReopenResult } from "./actions";
 
 const REASON_TEXT: Record<NonNullable<ReopenResult["reason"]>, string> = {
-  no_webhook: "but no email was sent — email sending isn't set up yet. Send them the link yourself.",
   no_link: "but no email was sent — there's no active link for this month. Generate one, then send it to them.",
   no_email: "but no email was sent — there's no email address on file for them. Add one on the Staff page, or text them the link.",
-  send_failed: "but the email didn't go through. Copy the link at the top of this page and send it to them yourself.",
+  send_failed: "but Gmail wouldn't send the email. Copy the link at the top of this page and send it to them yourself.",
 };
 
 // Per-person "let them answer again" control on the Response Tracker. Only
@@ -47,9 +46,13 @@ export function ReopenButton({
           outcome.emailed
             ? {
                 ok: true,
+                // Now a real claim: the app sends through Gmail itself and
+                // only reports success once Gmail has accepted the message,
+                // so this no longer means "handed to Zapier and hoped".
                 text:
-                  `${outcome.staffName} can answer again — emailed them the link and their PIN.` +
-                  (outcome.deadlineLabel ? ` Respond by ${outcome.deadlineLabel}.` : ""),
+                  `Email sent — ${outcome.staffName} can answer again.` +
+                  (outcome.deadlineLabel ? ` Respond by ${outcome.deadlineLabel}.` : "") +
+                  ` A copy is in your Gmail Sent folder.`,
               }
             : { ok: false, text: `${outcome.staffName} can answer again, ${REASON_TEXT[outcome.reason!]}` }
         );

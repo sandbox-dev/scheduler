@@ -18,6 +18,7 @@ import { SendAvailabilityButton } from "./SendAvailabilityButton";
 import { PixifiCheckButton } from "./PixifiCheckButton";
 import { AvailabilityChips } from "./AvailabilityChips";
 import { ReopenButton } from "./ReopenButton";
+import { TestEmailButton } from "./TestEmailButton";
 
 export default async function AvailabilityTrackerPage({
   searchParams,
@@ -145,6 +146,7 @@ export default async function AvailabilityTrackerPage({
                 initialDeadline={link?.deadline_at}
                 staff={staff.map((s) => ({ id: s.id, name: s.name }))}
               />
+              <TestEmailButton />
             </div>
           </>
         ) : (
