@@ -150,6 +150,8 @@ This one needs two things instead of just a Zap, since it runs on a schedule rat
 
 This is optional — without `CRON_SECRET` set, the route just returns 401 and nothing fires.
 
+Note that **"Send availability request" always sets the deadline for the whole month**, even when you use "Choose who" to send to one person — the deadline belongs to the month's link, not to a person. Everyone the app has asked that month keeps their automatic reminder either way; sending to one extra person adds them to the list rather than replacing it.
+
 ## Optional: notify the studio if anyone missed the deadline
 
 Same cron job as above, run once more when a deadline actually passes: if any active staff member still hasn't submitted, this emails the studio a list of who's missing. Stays silent if everyone got their availability in by the deadline (no separate "all clear" email — you'd already know from the "everyone's submitted" notification above).

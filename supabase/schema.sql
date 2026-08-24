@@ -620,9 +620,13 @@ alter table availability_links add column if not exists deadline_notice_sent_at 
 -- sent this one) got the 24h reminder anyway, because the reminder cron had
 -- no way to know "pending" should mean "was asked and hasn't answered," not
 -- just "active and has no submission row for this month." Set on every send
--- alongside the deadline reset above, for the same reason: a fresh send
--- starts a fresh cycle, and the recipient scope is part of that cycle just
--- like the deadline itself.
+-- alongside the deadline reset above. Accumulates across sends rather than
+-- being replaced (see mergeAskedStaffIds in src/lib/availability.ts): this
+-- is "everyone who has been asked this month," not "who the most recent send
+-- went to." Replacing it meant a follow-up send to one late-added person
+-- silently removed everyone else still outstanding from both the reminder
+-- and the deadline-missed notice. Widening is always safe — anyone who has
+-- actually submitted is filtered out by getPendingStaff regardless.
 alter table availability_links add column if not exists staff_ids uuid[];
 
 -- One row per "Send availability request" click — lets one owner see that
