@@ -3,7 +3,6 @@
 import { useTransition } from "react";
 import { Award, MapPin, AlertTriangle, Lock } from "lucide-react";
 import { Card } from "@/components/ui";
-import { EQUIPMENT_CASE_COUNT } from "@/lib/scheduling";
 import type { Role } from "@/lib/types";
 import { setAssignmentCase, swapAssignment } from "./actions";
 
@@ -19,6 +18,7 @@ export function ScheduleSlotCard({
   isGroupSlot,
   assignmentId,
   equipmentCase,
+  activeCaseNumbers,
   conflictWith,
   locked,
 }: {
@@ -31,9 +31,18 @@ export function ScheduleSlotCard({
   isGroupSlot?: boolean;
   assignmentId: string;
   equipmentCase: string;
+  activeCaseNumbers: number[];
   conflictWith?: string[];
   locked?: boolean;
 }) {
+  // An already-assigned case still shows even if it's since gone out of
+  // commission — same as an inactive staff member's existing assignment —
+  // it just isn't offered as a NEW pick going forward.
+  const currentCaseNumber = equipmentCase ? Number(equipmentCase) : null;
+  const caseOptions =
+    currentCaseNumber !== null && !activeCaseNumbers.includes(currentCaseNumber)
+      ? [...activeCaseNumbers, currentCaseNumber].sort((a, b) => a - b)
+      : activeCaseNumbers;
   const [pending, startTransition] = useTransition();
 
   const available = options.filter((o) => o.available);
@@ -125,9 +134,10 @@ export function ScheduleSlotCard({
           onChange={(e) => startTransition(() => setAssignmentCase(assignmentId, jobId, e.target.value))}
         >
           <option value="">Case — none</option>
-          {Array.from({ length: EQUIPMENT_CASE_COUNT }, (_, i) => i + 1).map((n) => (
+          {caseOptions.map((n) => (
             <option key={n} value={n}>
               Case {n}
+              {n === currentCaseNumber && !activeCaseNumbers.includes(n) ? " (out of commission)" : ""}
             </option>
           ))}
         </select>

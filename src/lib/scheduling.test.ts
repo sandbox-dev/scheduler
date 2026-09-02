@@ -6,6 +6,7 @@ import {
   distanceFor,
   roleCandidates,
   generateSchedule,
+  assignEquipmentCases,
   groupIdsByDate,
   mileagePayFor,
   mileageReport,
@@ -363,5 +364,153 @@ describe("generateSchedule", () => {
 
     const schedule = generateSchedule([job], staff, availability);
     expect(schedule["job1_2026-09-10"].assignments.Photographer[0]).toBeNull();
+  });
+});
+
+describe("assignEquipmentCases", () => {
+  function makeJob(overrides: Partial<JobWithDays> = {}): JobWithDays {
+    return {
+      id: "job1",
+      school_id: "school1",
+      name: "Test School",
+      client: "Test School",
+      category: "K-12",
+      school_type: "K-8",
+      enrollment: null,
+      locked: false,
+      picture_days: [],
+      ...overrides,
+    };
+  }
+
+  // Two photographers on the same date, same shape as the real bug report —
+  // Adi, 2026-09-01: "our case one is out of commission, and the app has it
+  // assigned incorrectly."
+  it("never hands out a case that isn't in the active list", () => {
+    const job = makeJob({
+      picture_days: [
+        {
+          id: "pd1", job_id: "job1", date: "2026-09-10", setups: 2, round_trip_miles: 0,
+          requires_supervisor: false, is_outdoor: false, has_group_photo: false, is_babies: false,
+          has_trainee: false, needs_review: false, photographer_adjustment: 0, assistant_adjustment: 0, supervisor_adjustment: 0,
+        },
+      ],
+    });
+    const staff = [
+      makeStaff({ id: "p1", roles: ["Photographer"], categories: ["K-12"] }),
+      makeStaff({ id: "p2", roles: ["Photographer"], categories: ["K-12"] }),
+    ];
+    const availability: Availability[] = [
+      { staff_id: "p1", picture_day_id: "pd1", available: true },
+      { staff_id: "p2", picture_day_id: "pd1", available: true },
+    ];
+
+    const schedule = generateSchedule([job], staff, availability);
+    const cases = assignEquipmentCases(schedule, [2, 3, 4]); // case 1 out of commission
+
+    expect([...cases.values()]).not.toContain(1);
+    expect([...cases.values()].sort()).toEqual([2, 3]);
+  });
+
+  it("leaves someone without a case rather than using an inactive one, when active cases run out", () => {
+    const job = makeJob({
+      picture_days: [
+        {
+          id: "pd1", job_id: "job1", date: "2026-09-10", setups: 2, round_trip_miles: 0,
+          requires_supervisor: false, is_outdoor: false, has_group_photo: false, is_babies: false,
+          has_trainee: false, needs_review: false, photographer_adjustment: 0, assistant_adjustment: 0, supervisor_adjustment: 0,
+        },
+      ],
+    });
+    const staff = [
+      makeStaff({ id: "p1", roles: ["Photographer"], categories: ["K-12"] }),
+      makeStaff({ id: "p2", roles: ["Photographer"], categories: ["K-12"] }),
+    ];
+    const availability: Availability[] = [
+      { staff_id: "p1", picture_day_id: "pd1", available: true },
+      { staff_id: "p2", picture_day_id: "pd1", available: true },
+    ];
+
+    const schedule = generateSchedule([job], staff, availability);
+    const cases = assignEquipmentCases(schedule, [2]); // only one active case, two photographers
+
+    expect(cases.size).toBe(1);
+    expect([...cases.values()]).toEqual([2]);
+  });
+
+  // Adi, 2026-09-01: "making sure there will only ever be one case per job
+  // and every photog needs a case, including the group photographer."
+  it("gives the dedicated group-photo slot its own case, same as any other Photographer slot", () => {
+    const job = makeJob({
+      picture_days: [
+        {
+          id: "pd1", job_id: "job1", date: "2026-09-10", setups: 2, round_trip_miles: 0,
+          requires_supervisor: false, is_outdoor: false, has_group_photo: true, is_babies: false,
+          has_trainee: false, needs_review: false, photographer_adjustment: 0, assistant_adjustment: 0, supervisor_adjustment: 0,
+        },
+      ],
+    });
+    const staff = [
+      makeStaff({ id: "p1", roles: ["Photographer"], categories: ["K-12", "Group Photography"] }),
+      makeStaff({ id: "p2", roles: ["Photographer"], categories: ["K-12"] }),
+      makeStaff({ id: "p3", roles: ["Photographer"], categories: ["K-12"] }),
+    ];
+    const availability: Availability[] = staff.map((s) => ({ staff_id: s.id, picture_day_id: "pd1", available: true }));
+
+    const schedule = generateSchedule([job], staff, availability);
+    const cases = assignEquipmentCases(schedule, [1, 2, 3, 4]);
+
+    // 2 regular slots + 1 group-photo slot, all filled, all distinct cases.
+    expect(cases.size).toBe(3);
+    expect(new Set(cases.values()).size).toBe(3);
+  });
+
+  // The auto-generator itself never double-books someone across two jobs the
+  // same day (AGENTS.md §4, usedPerDate) — this only happens via a manual
+  // reassignment, which §5 says CAN double-book, on purpose, flagged not
+  // blocked. So this builds the Schedule by hand rather than going through
+  // generateSchedule, which would never produce this shape.
+  it("gives the same photographer a different case for each of two jobs on the same day — one case can't be in two places", () => {
+    const scheduleShape = {
+      pdA: { id: "pdA", date: "2026-09-10", assignments: { Photographer: ["solo"], Assistant: [], Supervisor: [], Trainee: [] } },
+      pdB: { id: "pdB", date: "2026-09-10", assignments: { Photographer: ["solo"], Assistant: [], Supervisor: [], Trainee: [] } },
+    } as unknown as ReturnType<typeof generateSchedule>;
+
+    const cases = assignEquipmentCases(scheduleShape, [1, 2, 3, 4]);
+
+    expect(cases.get("pdA_0")).toBeDefined();
+    expect(cases.get("pdB_0")).toBeDefined();
+    expect(cases.get("pdA_0")).not.toBe(cases.get("pdB_0"));
+  });
+
+  // Adi, 2026-09-01: "cases should actually be rotated... so that we aren't
+  // favoring 1-3, to make sure some equipment doesn't get more wear."
+  it("rotates which case a NEW weekly assignment gets, instead of always the lowest free number", () => {
+    const week1Job = makeJob({ id: "job1", picture_days: [{
+      id: "pd1", job_id: "job1", date: "2026-09-01", setups: 1, round_trip_miles: 0,
+      requires_supervisor: false, is_outdoor: false, has_group_photo: false, is_babies: false,
+      has_trainee: false, needs_review: false, photographer_adjustment: 0, assistant_adjustment: 0, supervisor_adjustment: 0,
+    }] });
+    const week2Job = makeJob({ id: "job2", name: "Other School", client: "Other School", picture_days: [{
+      id: "pd2", job_id: "job2", date: "2026-09-08", setups: 1, round_trip_miles: 0,
+      requires_supervisor: false, is_outdoor: false, has_group_photo: false, is_babies: false,
+      has_trainee: false, needs_review: false, photographer_adjustment: 0, assistant_adjustment: 0, supervisor_adjustment: 0,
+    }] });
+    // Two different photographers, each working only their own non-overlapping week —
+    // no same-day collision, so each is getting a first-ever weekly case this run.
+    const staff = [
+      makeStaff({ id: "p1", roles: ["Photographer"], categories: ["K-12"] }),
+      makeStaff({ id: "p2", roles: ["Photographer"], categories: ["K-12"] }),
+    ];
+    const availability: Availability[] = [
+      { staff_id: "p1", picture_day_id: "pd1", available: true },
+      { staff_id: "p2", picture_day_id: "pd2", available: true },
+    ];
+
+    const schedule = generateSchedule([week1Job, week2Job], staff, availability);
+    const cases = assignEquipmentCases(schedule, [1, 2, 3, 4]);
+
+    // Without rotation both would land on case 1 (lowest free, every week resets usedToday).
+    expect(cases.get("pd1_0")).not.toBe(cases.get("pd2_0"));
   });
 });

@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Availability,
+  EquipmentCase,
   JobWithDays,
   School,
   ScheduleAssignment,
@@ -34,6 +35,13 @@ export async function getStaff(): Promise<Staff[]> {
   const { data, error } = await supabase.from("staff").select("*").order("name");
   if (error) throw error;
   return data as Staff[];
+}
+
+export async function getEquipmentCases(): Promise<EquipmentCase[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("equipment_cases").select("*").order("case_number");
+  if (error) throw error;
+  return data as EquipmentCase[];
 }
 
 export async function getAvailability(): Promise<Availability[]> {

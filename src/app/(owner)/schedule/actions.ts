@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getAvailability, getJobs, getSchools, getScheduleAssignments, getStaff, getStaffSchoolDistances } from "@/lib/data";
+import { getAvailability, getEquipmentCases, getJobs, getSchools, getScheduleAssignments, getStaff, getStaffSchoolDistances } from "@/lib/data";
 import { assignEquipmentCases, buildStaffScheduleRows, fmtDate, generateSchedule, neededDatesSummary } from "@/lib/scheduling";
 import { monthLabel } from "@/lib/month";
 import { ROLES, type Role } from "@/lib/types";
@@ -14,18 +14,25 @@ import { scheduleApprovedEmail } from "@/lib/emails";
 // job from being wiped and reworked when regenerating the rest of a busy
 // month.
 export async function generateAndSaveSchedule(month: string) {
-  const [allJobs, staff, availability, staffSchoolDistances] = await Promise.all([
+  const [allJobs, staff, availability, staffSchoolDistances, equipmentCaseRows] = await Promise.all([
     getJobs(),
     getStaff(),
     getAvailability(),
     getStaffSchoolDistances(),
+    getEquipmentCases(),
   ]);
   const jobs = allJobs
     .filter((j) => !j.locked)
     .map((j) => ({ ...j, picture_days: j.picture_days.filter((d) => d.date.startsWith(month.slice(0, 7))) }))
     .filter((j) => j.picture_days.length > 0);
   const schedule = generateSchedule(jobs, staff, availability, staffSchoolDistances);
-  const equipmentCases = assignEquipmentCases(schedule);
+  const activeCaseNumbers = equipmentCaseRows.filter((c) => c.active).map((c) => c.case_number);
+  // Adi, 2026-09-01: "if anyone needs to share a case it's julia and i" —
+  // the owners lose a same-day case-number collision first, see
+  // assignEquipmentCases. Matched by name; there's no separate "owner" flag
+  // on staff today.
+  const lowPriorityStaffIds = new Set(staff.filter((s) => s.name === "Adi" || s.name === "Julia").map((s) => s.id));
+  const equipmentCases = assignEquipmentCases(schedule, activeCaseNumbers, lowPriorityStaffIds);
 
   const rows: {
     picture_day_id: string;
@@ -94,6 +101,18 @@ export async function swapAssignment(
 
   revalidatePath("/schedule");
   revalidatePath("/mileage");
+}
+
+// Marking a case out of commission only affects assignments made from here
+// forward (assignEquipmentCases reads this fresh every time it runs) —
+// anything already written to schedule_assignments before the flip is
+// untouched, same as an already-assigned inactive staff member's row still
+// displaying fine. Fixing an existing future assignment that already used
+// the now-inactive case is a separate, deliberate action, not automatic.
+export async function setCaseActive(caseNumber: number, active: boolean) {
+  const supabase = await createClient();
+  await supabase.from("equipment_cases").update({ active, updated_at: new Date().toISOString() }).eq("case_number", caseNumber);
+  revalidatePath("/schedule");
 }
 
 export async function setAssignmentCase(assignmentId: string, jobId: string, equipmentCase: string) {

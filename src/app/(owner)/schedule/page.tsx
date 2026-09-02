@@ -3,6 +3,7 @@ import { LayoutList, CalendarRange, ChevronLeft, ChevronRight, Users, Download }
 import {
   getApprovalForMonth,
   getAvailability,
+  getEquipmentCases,
   getJobs,
   getScheduleAssignments,
   getStaff,
@@ -39,6 +40,7 @@ import { PrintButton } from "./PrintButton";
 import { ScheduleSlotCard } from "./ScheduleSlotCard";
 import { CalendarView } from "./CalendarView";
 import { ApproveButton } from "./ApproveButton";
+import { CasesPanel } from "./CasesPanel";
 import { LockJobButton } from "../jobs/LockJobButton";
 
 export default async function SchedulePage({
@@ -49,13 +51,15 @@ export default async function SchedulePage({
   const sp = await searchParams;
   const view = sp.view === "calendar" ? "calendar" : sp.view === "staff" ? "staff" : "list";
   const range = sp.range === "week" ? "week" : "month";
-  const [jobs, staff, availability, assignments, staffSchoolDistances] = await Promise.all([
+  const [jobs, staff, availability, assignments, staffSchoolDistances, equipmentCases] = await Promise.all([
     getJobs(),
     getStaff(),
     getAvailability(),
     getScheduleAssignments(),
     getStaffSchoolDistances(),
+    getEquipmentCases(),
   ]);
+  const activeCaseNumbers = equipmentCases.filter((c) => c.active).map((c) => c.case_number);
 
   const allNeeded = neededDatesSummary(jobs);
   const monthsWithData = getMonthsWithDates(allNeeded.map((n) => n.date));
@@ -215,6 +219,10 @@ export default async function SchedulePage({
         </Card>
       )}
 
+      <Card style={{ marginBottom: 16, padding: 0 }}>
+        <CasesPanel cases={equipmentCases} defaultOpen={equipmentCases.some((c) => !c.active)} />
+      </Card>
+
       {needed.length === 0 && view === "list" && (
         <Card>
           <div style={{ fontSize: 13.5, color: "var(--muted)" }}>No Picture Days booked for {monthLabel(month)}.</div>
@@ -358,6 +366,7 @@ export default async function SchedulePage({
                                   isGroupSlot={isGroupSlot}
                                   assignmentId={a.id}
                                   equipmentCase={a.equipment_case}
+                                  activeCaseNumbers={activeCaseNumbers}
                                   conflictWith={conflictWith}
                                   locked={lockedJobIds.has(jd.jobId)}
                                   assigned={

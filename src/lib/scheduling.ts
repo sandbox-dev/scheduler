@@ -250,17 +250,53 @@ export function generateSchedule(
 
 export const EQUIPMENT_CASE_COUNT = 4;
 
-// Assigns one of the studio's 4 physical equipment cases to every filled
+// Assigns one of the studio's physical equipment cases to every filled
 // Photographer slot (regular setup or the group-photo slot — both need a
 // case out the door). Prefers giving each photographer the SAME case for
 // every job they shoot that week, since swapping cases day to day is a
 // hassle; only breaks that preference when two of their jobs land on the
 // same date (a case can't be in two places at once) or a fresh case needs
-// picking. If more than 4 photographers work the same date, whoever doesn't
-// fit is left without a case — a real capacity problem, not something to
-// silently paper over.
-export function assignEquipmentCases(schedule: Schedule): Map<string, number> {
+// picking. If more photographers work a date than there are active cases,
+// whoever doesn't fit is left without a case — a real capacity problem, not
+// something to silently paper over.
+//
+// activeCaseNumbers comes from the equipment_cases table, not the bare
+// EQUIPMENT_CASE_COUNT literal — a case marked out of commission (Adi,
+// 2026-09-01: "our case one is out of commission, and the app has it
+// assigned incorrectly") is simply never offered here, same shape as
+// roleCandidates() filtering to staff.active (AGENTS.md §13). Only affects
+// assignments made from here forward; a case already written to an existing
+// row before it went inactive is untouched unless something regenerates it.
+//
+// lowPriorityStaffIds (Adi and Julia's staff ids) lose ties for a case, not
+// slots. Adi, 2026-09-01: "cases should be linked to photographers... each
+// photographer for the week gets the same case for all the days they work.
+// and if anyone needs to share a case it's julia and i" — then, once "share"
+// turned out to mean nobody can ever be short a case, refined to: the only
+// real question is whose weekly case wins when two photographers' preferred
+// numbers collide on the same date (both worked separate days earlier in the
+// week and happened to land on the same free-lowest-number logic) — that
+// should cost Adi/Julia their streak that day, never a staff photographer's.
+// Processed last in both passes so regular staff claim their usual case (or
+// the lowest free one) before Adi/Julia are even considered.
+export function assignEquipmentCases(
+  schedule: Schedule,
+  activeCaseNumbers: number[],
+  lowPriorityStaffIds: Set<string> = new Set()
+): Map<string, number> {
   const bySlotKey = new Map<string, number>();
+
+  // Tallied across the whole run (every week in this generation), not reset
+  // per week — a NEW weekly assignment goes to whichever active case has
+  // been used least so far this month, instead of always the lowest free
+  // number. Adi, 2026-09-01: "cases should actually be rotated... so that we
+  // aren't favoring 1-3 for example" (case 1 was out of commission at the
+  // time; the point holds for whichever numbers are active). Resets to zero
+  // on the next call — this run has no memory of last month, by her choice:
+  // "within the current month is fine." Doesn't touch the weekly-preference
+  // logic below at all — only which NEW number gets picked when someone
+  // doesn't have one yet.
+  const usageCount = new Map<number, number>(activeCaseNumbers.map((c) => [c, 0]));
 
   const photographerSlots = Object.values(schedule).flatMap((slot) =>
     slot.assignments.Photographer
@@ -279,7 +315,12 @@ export function assignEquipmentCases(schedule: Schedule): Map<string, number> {
     const weeklyCaseByStaff = new Map<string, number>();
 
     [...byDate.keys()].sort().forEach((date) => {
-      const slotsToday = byDate.get(date)!;
+      // Regular staff get first crack at their usual case (or the lowest
+      // free one); a low-priority staffId only loses a tie because it's
+      // considered after everyone else has already claimed theirs.
+      const slotsToday = [...byDate.get(date)!].sort(
+        (a, b) => Number(lowPriorityStaffIds.has(a.staffId)) - Number(lowPriorityStaffIds.has(b.staffId))
+      );
       const usedToday = new Set<number>();
       const unresolved: typeof slotsToday = [];
 
@@ -289,21 +330,27 @@ export function assignEquipmentCases(schedule: Schedule): Map<string, number> {
         if (preferred !== undefined && !usedToday.has(preferred)) {
           bySlotKey.set(`${s.pictureDayId}_${s.slotIndex}`, preferred);
           usedToday.add(preferred);
+          usageCount.set(preferred, (usageCount.get(preferred) || 0) + 1);
         } else {
           unresolved.push(s);
         }
       });
 
-      // Second pass: hand out whatever's left to everyone else today.
+      // Second pass: hand out whatever's left to everyone else today —
+      // whichever active case has seen the least use so far this month,
+      // not the lowest free number (that's the rotation itself; ties keep
+      // the original, lowest-first order, which only matters the very
+      // first time a case is ever handed out this run).
       unresolved.forEach((s) => {
         let assignedCase: number | null = null;
-        for (let c = 1; c <= EQUIPMENT_CASE_COUNT; c++) {
+        for (const c of [...activeCaseNumbers].sort((a, b) => (usageCount.get(a) || 0) - (usageCount.get(b) || 0))) {
           if (!usedToday.has(c)) {
             assignedCase = c;
             break;
           }
         }
-        if (assignedCase === null) return; // more photographers than cases today
+        if (assignedCase === null) return; // more photographers than active cases today
+        usageCount.set(assignedCase, (usageCount.get(assignedCase) || 0) + 1);
         usedToday.add(assignedCase);
         bySlotKey.set(`${s.pictureDayId}_${s.slotIndex}`, assignedCase);
         if (!weeklyCaseByStaff.has(s.staffId)) weeklyCaseByStaff.set(s.staffId, assignedCase);

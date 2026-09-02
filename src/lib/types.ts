@@ -103,6 +103,11 @@ export type ScheduleAssignment = {
   equipment_case: string;
 };
 
+export type EquipmentCase = {
+  case_number: number;
+  active: boolean;
+};
+
 export type StaffSchoolDistance = {
   staff_id: string;
   school_id: string;
