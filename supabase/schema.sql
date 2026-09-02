@@ -169,6 +169,24 @@ begin
   end if;
 end $$;
 
+-- The studio's physical equipment cases as real rows, not just the bare
+-- EQUIPMENT_CASE_COUNT literal in scheduling.ts. Adi, 2026-09-01: "our case
+-- one is out of commission, and the app has it assigned incorrectly" — same
+-- shape as the staff.active gap (§13, AGENTS.md): assignEquipmentCases() and
+-- the manual case dropdown both need to skip a case that's out of commission,
+-- same as roleCandidates() already skips inactive staff. Seeded with the 4
+-- cases the studio has today; add a row here (not a code change) if a 5th is
+-- ever bought.
+create table if not exists equipment_cases (
+  case_number integer primary key,
+  active boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+insert into equipment_cases (case_number)
+select generate_series(1, 4)
+on conflict (case_number) do nothing;
+
 -- Cached staff-to-school distances (Distance Matrix API), used to rank
 -- schedule candidates by proximity to the actual job, not the studio.
 -- Computed once per staff+school pair and reused for every future booking
@@ -227,6 +245,7 @@ alter table availability_links enable row level security;
 alter table staff_school_distances enable row level security;
 alter table availability_notes enable row level security;
 alter table schedule_approvals enable row level security;
+alter table equipment_cases enable row level security;
 
 drop policy if exists "owners full access" on schools;
 create policy "owners full access" on schools for all to authenticated using (true) with check (true);
@@ -257,6 +276,9 @@ create policy "owners full access" on availability_notes for all to authenticate
 
 drop policy if exists "owners full access" on schedule_approvals;
 create policy "owners full access" on schedule_approvals for all to authenticated using (true) with check (true);
+
+drop policy if exists "owners full access" on equipment_cases;
+create policy "owners full access" on equipment_cases for all to authenticated using (true) with check (true);
 
 -- No policies granted to `anon` — the public availability page reaches data
 -- exclusively through the SECURITY DEFINER functions below.
