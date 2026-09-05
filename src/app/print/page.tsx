@@ -3,6 +3,7 @@ import { getJobs, getScheduleAssignments, getStaff } from "@/lib/data";
 import { flattenJobDays, fmtDate, jobDayPositions } from "@/lib/scheduling";
 import { addDays, computeJobLanes, getWeekGrid, mondayOf, shiftWeek } from "@/lib/month";
 import { PrintControls } from "./PrintControls";
+import { FitOnePage } from "./FitOnePage";
 
 const ROLE_COLOR: Record<string, string> = {
   Photographer: "var(--role-photographer)",
@@ -80,6 +81,7 @@ export default async function PrintPage({
         label={`${fmtDate(weekStart).md} – ${fmtDate(addDays(weekStart, 6)).md}`}
       />
 
+      <FitOnePage>
       <div
         style={{
           display: "flex",
@@ -239,6 +241,7 @@ export default async function PrintPage({
         <span style={{ borderTop: "3px solid var(--outdoor)", paddingTop: 3, marginRight: 18 }}>Outdoor</span>
         <span style={{ borderTop: "3px solid var(--indoor)", paddingTop: 3 }}>Indoor</span>
       </div>
+      </FitOnePage>
     </div>
   );
 }
