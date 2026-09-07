@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { CalendarDays, Users, CheckCircle2, Award, AlertTriangle } from "lucide-react";
+import { CalendarDays, Users, CheckCircle2, Award, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { getJobs, getStaff, getAvailability, getScheduleAssignments } from "@/lib/data";
 import { flattenJobDays, jobDayPositions, neededDatesSummary, fmtDate } from "@/lib/scheduling";
-import { getMonthsWithDates, getWeekGrid, mondayOf, monthLabel, pickDefaultMonth, selectableMonths } from "@/lib/month";
+import { addDays, getMonthsWithDates, getWeekGrid, mondayOf, monthLabel, pickDefaultMonth, selectableMonths, shiftWeek } from "@/lib/month";
 import { Card, Stat } from "@/components/ui";
 import { MonthPicker } from "@/components/MonthPicker";
 import { CalendarView } from "../schedule/CalendarView";
@@ -10,7 +10,7 @@ import { CalendarView } from "../schedule/CalendarView";
 export default async function OverviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; week?: string }>;
 }) {
   const sp = await searchParams;
   const [jobs, staff, availability, assignments] = await Promise.all([
@@ -50,14 +50,16 @@ export default async function OverviewPage({
   // "Who's scheduled this week" — Adi, 2026-09-06: most visits to Scheduler
   // aren't to build a schedule, they're to check who's already on for the
   // current week, and that meant a detour through the Schedule page's own
-  // month/week toggle every time. Always today's real week, independent of
-  // the month picker above — reuses the Schedule page's own CalendarView in
-  // weekMode (same staffing-per-role display), with linkBase="/schedule" so
-  // clicking a date or a job card lands on the real Schedule page at that
-  // week/job instead of trying to apply Schedule-only query params to this
-  // page.
+  // month/week toggle every time. Defaults to today's real week, independent
+  // of the month picker above, but its own prev/next arrows (added same day:
+  // "can you add back and forth arrows so we can scroll to the next week or
+  // backwards?") move it via a separate `week` query param — reuses the
+  // Schedule page's own CalendarView in weekMode (same staffing-per-role
+  // display), with linkBase="/schedule" so clicking a date or a job card
+  // lands on the real Schedule page at that week/job instead of trying to
+  // apply Schedule-only query params to this page.
   const todayIso = new Date().toISOString().slice(0, 10);
-  const thisWeekStart = mondayOf(todayIso);
+  const thisWeekStart = sp.week && /^\d{4}-\d{2}-\d{2}$/.test(sp.week) ? mondayOf(sp.week) : mondayOf(todayIso);
   // The Schedule page only accepts a "YYYY-MM-01" month param (its own
   // regex check) — thisWeekStart is a Monday, not necessarily the 1st, so
   // the links this widget generates need this instead, or the Schedule page
@@ -126,8 +128,21 @@ export default async function OverviewPage({
       </div>
 
       <div style={{ marginTop: 24 }}>
-        <div style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", fontWeight: 700, marginBottom: 10 }}>
-          This Week
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <div style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", fontWeight: 700 }}>
+            This Week
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Link href={`?month=${month}&week=${shiftWeek(thisWeekStart, -1)}`} className="btn-secondary" style={{ padding: "4px 7px" }} title="Previous week">
+              <ChevronLeft size={13} />
+            </Link>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", minWidth: 120, textAlign: "center" }}>
+              {fmtDate(thisWeekStart).md} – {fmtDate(addDays(thisWeekStart, 6)).md}
+            </span>
+            <Link href={`?month=${month}&week=${shiftWeek(thisWeekStart, 1)}`} className="btn-secondary" style={{ padding: "4px 7px" }} title="Next week">
+              <ChevronRight size={13} />
+            </Link>
+          </div>
         </div>
         <CalendarView
           weeks={[thisWeekGrid]}
