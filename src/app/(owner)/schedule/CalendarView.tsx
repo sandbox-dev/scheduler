@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { CalendarDay } from "@/lib/month";
-import { computeJobLanes } from "@/lib/month";
+import { computeJobLanes, mondayOf } from "@/lib/month";
 import type { FlatJobDay } from "@/lib/scheduling";
 import type { ScheduleAssignment } from "@/lib/types";
 import { ROLES, type Role } from "@/lib/types";
@@ -28,6 +28,7 @@ export function CalendarView({
   dayPositions,
   month,
   weekMode,
+  linkBase = "",
 }: {
   weeks: CalendarDay[][];
   jobsByDate: Map<string, FlatJobDay[]>;
@@ -37,6 +38,12 @@ export function CalendarView({
   dayPositions: Map<string, { index: number; total: number }>;
   month: string;
   weekMode?: boolean;
+  // Prefixes every link this component makes ("" — the default — keeps this
+  // page's own relative "?month=..." links unchanged). Set to "/schedule"
+  // when this same component is reused somewhere that isn't already the
+  // Schedule page itself (Adi, 2026-09-06: a week-at-a-glance on the
+  // Overview dash whose date clicks need to land on the real Schedule page).
+  linkBase?: string;
 }) {
   return (
     <div className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -68,8 +75,9 @@ export function CalendarView({
             }}
           >
             {week.map((day, i) => (
-              <div
+              <Link
                 key={`num-${day.date}`}
+                href={`${linkBase}?month=${month}&range=week&week=${mondayOf(day.date)}`}
                 style={{
                   gridColumn: i + 1,
                   gridRow: 1,
@@ -77,10 +85,11 @@ export function CalendarView({
                   fontSize: 11,
                   fontWeight: 700,
                   color: "var(--muted)",
+                  textDecoration: "none",
                 }}
               >
                 {Number(day.date.slice(8, 10))}
-              </div>
+              </Link>
             ))}
 
             {/* Column backgrounds so empty lane gaps still show grid lines / out-of-month shading */}
@@ -105,7 +114,7 @@ export function CalendarView({
                 return (
                   <Link
                     key={jd.id}
-                    href={`?month=${month}&view=list#${day.date}`}
+                    href={`${linkBase}?month=${month}&view=list#${day.date}`}
                     style={{
                       gridColumn: i + 1,
                       gridRow: lane + 2,
