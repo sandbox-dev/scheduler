@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { CalendarDays, Users, CheckCircle2, Award, AlertTriangle } from "lucide-react";
-import { getJobs, getStaff, getAvailability } from "@/lib/data";
-import { neededDatesSummary, fmtDate } from "@/lib/scheduling";
-import { getMonthsWithDates, monthLabel, pickDefaultMonth, selectableMonths } from "@/lib/month";
+import { getJobs, getStaff, getAvailability, getScheduleAssignments } from "@/lib/data";
+import { flattenJobDays, jobDayPositions, neededDatesSummary, fmtDate } from "@/lib/scheduling";
+import { getMonthsWithDates, getWeekGrid, mondayOf, monthLabel, pickDefaultMonth, selectableMonths } from "@/lib/month";
 import { Card, Stat } from "@/components/ui";
 import { MonthPicker } from "@/components/MonthPicker";
+import { CalendarView } from "../schedule/CalendarView";
 
 export default async function OverviewPage({
   searchParams,
@@ -12,7 +13,12 @@ export default async function OverviewPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const sp = await searchParams;
-  const [jobs, staff, availability] = await Promise.all([getJobs(), getStaff(), getAvailability()]);
+  const [jobs, staff, availability, assignments] = await Promise.all([
+    getJobs(),
+    getStaff(),
+    getAvailability(),
+    getScheduleAssignments(),
+  ]);
 
   const allNeeded = neededDatesSummary(jobs);
   const monthsWithData = getMonthsWithDates(allNeeded.map((n) => n.date));
@@ -40,6 +46,40 @@ export default async function OverviewPage({
     { href: "/availability-tracker", icon: CheckCircle2, title: "Availability", desc: "Send dates and collect responses." },
     { href: "/schedule", icon: Award, title: "Schedule", desc: "Auto-assign by priority, category, distance." },
   ];
+
+  // "Who's scheduled this week" — Adi, 2026-09-06: most visits to Scheduler
+  // aren't to build a schedule, they're to check who's already on for the
+  // current week, and that meant a detour through the Schedule page's own
+  // month/week toggle every time. Always today's real week, independent of
+  // the month picker above — reuses the Schedule page's own CalendarView in
+  // weekMode (same staffing-per-role display), with linkBase="/schedule" so
+  // clicking a date or a job card lands on the real Schedule page at that
+  // week/job instead of trying to apply Schedule-only query params to this
+  // page.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const thisWeekStart = mondayOf(todayIso);
+  // The Schedule page only accepts a "YYYY-MM-01" month param (its own
+  // regex check) — thisWeekStart is a Monday, not necessarily the 1st, so
+  // the links this widget generates need this instead, or the Schedule page
+  // silently falls back to its own default month while still (correctly)
+  // honoring the week= param.
+  const thisWeekMonthParam = `${thisWeekStart.slice(0, 7)}-01`;
+  // A standalone week has no surrounding "month" to compare against — every
+  // day here should read as fully "in" the view, not dimmed the way a week
+  // spilling over a month boundary would be on the Schedule page itself.
+  const thisWeekGrid = getWeekGrid(thisWeekStart, thisWeekStart).map((d) => ({ ...d, inMonth: true }));
+  const thisWeekDates = new Set(thisWeekGrid.map((d) => d.date));
+  const thisWeekPictureDayIds = new Set(
+    allNeeded.filter((n) => thisWeekDates.has(n.date)).flatMap((n) => n.jobs.map((jd) => jd.id))
+  );
+  const hasScheduleThisWeek = assignments.some((a) => thisWeekPictureDayIds.has(a.picture_day_id));
+  const weekAssignmentsByDay = new Map<string, typeof assignments>();
+  assignments.forEach((a) => {
+    if (!thisWeekPictureDayIds.has(a.picture_day_id)) return;
+    const list = weekAssignmentsByDay.get(a.picture_day_id) || [];
+    list.push(a);
+    weekAssignmentsByDay.set(a.picture_day_id, list);
+  });
 
   return (
     <div>
@@ -83,6 +123,23 @@ export default async function OverviewPage({
             </Card>
           </Link>
         ))}
+      </div>
+
+      <div style={{ marginTop: 24 }}>
+        <div style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", fontWeight: 700, marginBottom: 10 }}>
+          This Week
+        </div>
+        <CalendarView
+          weeks={[thisWeekGrid]}
+          jobsByDate={new Map(allNeeded.filter((n) => thisWeekDates.has(n.date)).map((n) => [n.date, n.jobs]))}
+          assignmentsByDay={weekAssignmentsByDay}
+          hasScheduleThisMonth={hasScheduleThisWeek}
+          staffNameById={new Map(staff.map((s) => [s.id, s.name]))}
+          dayPositions={jobDayPositions(flattenJobDays(jobs))}
+          month={thisWeekMonthParam}
+          weekMode
+          linkBase="/schedule"
+        />
       </div>
 
       <div style={{ marginTop: 24 }}>
