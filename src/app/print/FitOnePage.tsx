@@ -23,21 +23,30 @@ const PX_PER_IN = 96;
 // the one failure mode that actually matters here.
 const SAFETY_MARGIN = 0.96;
 
+// The grid's own width is pinned to this (below) rather than measured, so
+// it's always judged against the real printed page width — not whatever the
+// browser window happens to be sized to on screen. Measuring the natural
+// (unpinned) width instead caused this to shrink far more than necessary on
+// a wide monitor: laid out that wide, the grid's rows wrap less and read as
+// "shorter" than they actually are at print width, so the shrink computed
+// from the screen-width measurement was way more aggressive than the page
+// actually needed — found 2026-09-14 printing way too small on a real
+// laptop screen.
+const AVAILABLE_WIDTH_PX = (PAGE_WIDTH_IN - PAGE_MARGIN_IN * 2) * PX_PER_IN;
+const AVAILABLE_HEIGHT_PX = (PAGE_HEIGHT_IN - PAGE_MARGIN_IN * 2) * PX_PER_IN * SAFETY_MARGIN;
+
 export function FitOnePage({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
+  const [naturalHeight, setNaturalHeight] = useState<number | null>(null);
 
   useEffect(() => {
     function recompute() {
       const el = ref.current;
       if (!el) return;
-      const { scrollWidth, scrollHeight } = el;
-      setNaturalSize({ width: scrollWidth, height: scrollHeight });
-      const availableWidthPx = (PAGE_WIDTH_IN - PAGE_MARGIN_IN * 2) * PX_PER_IN * SAFETY_MARGIN;
-      const availableHeightPx = (PAGE_HEIGHT_IN - PAGE_MARGIN_IN * 2) * PX_PER_IN * SAFETY_MARGIN;
-      const next = Math.min(1, availableWidthPx / scrollWidth, availableHeightPx / scrollHeight);
-      setScale(next);
+      const { scrollHeight } = el;
+      setNaturalHeight(scrollHeight);
+      setScale(Math.min(1, AVAILABLE_HEIGHT_PX / scrollHeight));
     }
     recompute();
     // Re-checked right before the browser actually prints — a logo image or
@@ -59,8 +68,13 @@ export function FitOnePage({ children }: { children: React.ReactNode }) {
           element paints, so without an explicit height here the original
           (unscaled) space stays reserved and a mostly-blank second page
           follows anyway. */}
-      <div style={naturalSize ? { width: naturalSize.width * scale, height: naturalSize.height * scale } : undefined}>
-        <div ref={ref} style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}>
+      <div
+        style={{
+          width: AVAILABLE_WIDTH_PX * scale,
+          height: naturalHeight != null ? naturalHeight * scale : undefined,
+        }}
+      >
+        <div ref={ref} style={{ width: AVAILABLE_WIDTH_PX, transform: `scale(${scale})`, transformOrigin: "top left" }}>
           {children}
         </div>
       </div>
