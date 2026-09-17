@@ -104,7 +104,8 @@ export function CasesPanel({
         <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Assign / Reassign Cases</div>
           <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10 }}>
-            Applies to {scopeLabel} (switch Month/Week above to change the range).
+            Applies to {scopeLabel}. To change that, use the Month / Week tabs at the top of the page, then come back
+            here.
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" className="btn-secondary" disabled={assigning} onClick={() => handleAssign("fillOnly")}>
