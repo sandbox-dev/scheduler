@@ -220,7 +220,16 @@ export default async function SchedulePage({
       )}
 
       <Card style={{ marginBottom: 16, padding: 0 }}>
-        <CasesPanel cases={equipmentCases} defaultOpen={equipmentCases.some((c) => !c.active)} />
+        <CasesPanel
+          cases={equipmentCases}
+          defaultOpen={equipmentCases.some((c) => !c.active)}
+          scope={range === "week" ? { kind: "week", weekStart } : { kind: "month", month }}
+          scopeLabel={
+            range === "week"
+              ? `the week of ${fmtDate(weekStart).md}–${fmtDate(addDays(weekStart, 6)).md}`
+              : monthLabel(month)
+          }
+        />
       </Card>
 
       {needed.length === 0 && view === "list" && (

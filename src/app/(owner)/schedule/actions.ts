@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAvailability, getEquipmentCases, getJobs, getSchools, getScheduleAssignments, getStaff, getStaffSchoolDistances } from "@/lib/data";
-import { assignEquipmentCases, buildStaffScheduleRows, fmtDate, generateSchedule, neededDatesSummary } from "@/lib/scheduling";
-import { monthLabel } from "@/lib/month";
-import { ROLES, type Role } from "@/lib/types";
+import { assignEquipmentCases, buildStaffScheduleRows, flattenJobDays, fmtDate, generateSchedule, neededDatesSummary, type FlatJobDay, type Schedule, type ScheduleSlot } from "@/lib/scheduling";
+import { addDays, monthLabel } from "@/lib/month";
+import { ROLES, type Role, type ScheduleAssignment } from "@/lib/types";
 import { sendGmailMessage } from "@/lib/gmail";
 import { scheduleApprovedEmail } from "@/lib/emails";
 
@@ -13,26 +13,30 @@ import { scheduleApprovedEmail } from "@/lib/emails";
 // schedule_assignments are left untouched so a lock actually protects a
 // job from being wiped and reworked when regenerating the rest of a busy
 // month.
+//
+// Deliberately does NOT touch equipment_case (moved to its own explicit step,
+// assignCasesForScope below) — Adi, 2026-09-16: cases should be a separate
+// button clicked once the staffing schedule is settled, not something that
+// gets silently recomputed every time Regenerate runs. Previously this
+// called assignEquipmentCases() inline, which meant a case could get
+// reshuffled by an unrelated Regenerate with no visible signal, and a manual
+// staff swap afterward (swapAssignment, below) never touched the case at
+// all — it just stayed glued to the slot rather than following whoever was
+// newly in it. Every schedule_assignments row this writes now always starts
+// with equipment_case: "" (the column's own default) until assignCasesForScope
+// is run.
 export async function generateAndSaveSchedule(month: string) {
-  const [allJobs, staff, availability, staffSchoolDistances, equipmentCaseRows] = await Promise.all([
+  const [allJobs, staff, availability, staffSchoolDistances] = await Promise.all([
     getJobs(),
     getStaff(),
     getAvailability(),
     getStaffSchoolDistances(),
-    getEquipmentCases(),
   ]);
   const jobs = allJobs
     .filter((j) => !j.locked)
     .map((j) => ({ ...j, picture_days: j.picture_days.filter((d) => d.date.startsWith(month.slice(0, 7))) }))
     .filter((j) => j.picture_days.length > 0);
   const schedule = generateSchedule(jobs, staff, availability, staffSchoolDistances);
-  const activeCaseNumbers = equipmentCaseRows.filter((c) => c.active).map((c) => c.case_number);
-  // Adi, 2026-09-01: "if anyone needs to share a case it's julia and i" —
-  // the owners lose a same-day case-number collision first, see
-  // assignEquipmentCases. Matched by name; there's no separate "owner" flag
-  // on staff today.
-  const lowPriorityStaffIds = new Set(staff.filter((s) => s.name === "Adi" || s.name === "Julia").map((s) => s.id));
-  const equipmentCases = assignEquipmentCases(schedule, activeCaseNumbers, lowPriorityStaffIds);
 
   const rows: {
     picture_day_id: string;
@@ -40,21 +44,18 @@ export async function generateAndSaveSchedule(month: string) {
     role: Role;
     slot_index: number;
     staff_id: string | null;
-    equipment_case: string;
   }[] = [];
 
   Object.values(schedule).forEach((slot) => {
     ROLES.forEach((role) => {
       const needed = slot.crew[role] || 0;
       for (let i = 0; i < needed; i++) {
-        const equipmentCase = role === "Photographer" ? equipmentCases.get(`${slot.id}_${i}`) : undefined;
         rows.push({
           picture_day_id: slot.id,
           job_id: slot.jobId,
           role,
           slot_index: i,
           staff_id: slot.assignments[role][i] || null,
-          equipment_case: equipmentCase !== undefined ? String(equipmentCase) : "",
         });
       }
     });
@@ -104,15 +105,114 @@ export async function swapAssignment(
 }
 
 // Marking a case out of commission only affects assignments made from here
-// forward (assignEquipmentCases reads this fresh every time it runs) —
-// anything already written to schedule_assignments before the flip is
+// forward (assignCasesForScope, below, reads this fresh every time it runs)
+// — anything already written to schedule_assignments before the flip is
 // untouched, same as an already-assigned inactive staff member's row still
-// displaying fine. Fixing an existing future assignment that already used
-// the now-inactive case is a separate, deliberate action, not automatic.
+// displaying fine. Fixing an existing assignment that already used the
+// now-inactive case means running Assign/Reassign Cases again — a separate,
+// deliberate action, not automatic.
 export async function setCaseActive(caseNumber: number, active: boolean) {
   const supabase = await createClient();
   await supabase.from("equipment_cases").update({ active, updated_at: new Date().toISOString() }).eq("case_number", caseNumber);
   revalidatePath("/schedule");
+}
+
+export type CaseAssignScope = { kind: "month"; month: string } | { kind: "week"; weekStart: string };
+export type AssignCasesResult = { updated: number; total: number };
+
+// Rebuilds the same Schedule shape assignEquipmentCases() needs (see
+// scheduling.ts), but from whoever is ALREADY staffed in schedule_assignments
+// rather than from a fresh generateSchedule() run — this must never change
+// who's working, only which case they carry.
+function buildScheduleFromAssignments(jobDays: FlatJobDay[], assignments: ScheduleAssignment[]): Schedule {
+  const schedule: Schedule = {};
+  const byPictureDay = new Map<string, ScheduleAssignment[]>();
+  assignments.forEach((a) => {
+    const list = byPictureDay.get(a.picture_day_id) || [];
+    list.push(a);
+    byPictureDay.set(a.picture_day_id, list);
+  });
+
+  jobDays.forEach((jd) => {
+    const slotKey = `${jd.jobId}_${jd.date}`;
+    const slot: ScheduleSlot = {
+      ...jd,
+      slotKey,
+      assignments: { Photographer: [], Assistant: [], Supervisor: [], Trainee: [] },
+    };
+    ROLES.forEach((role) => {
+      slot.assignments[role] = new Array(jd.crew[role] || 0).fill(null);
+    });
+    (byPictureDay.get(jd.id) || []).forEach((a) => {
+      if (a.slot_index < slot.assignments[a.role].length) slot.assignments[a.role][a.slot_index] = a.staff_id;
+    });
+    schedule[slotKey] = slot;
+  });
+
+  return schedule;
+}
+
+// The explicit "Assign Cases" / "Reassign All Cases" step — Adi, 2026-09-16:
+// "once we are done with the schedule, we click a button to assign cases,
+// then approve the schedule... after the fact, if we make a schedule change,
+// we can choose to leave the cases as is OR reassign... we can regenerate
+// case assignments for the month or per week."
+//
+// Works on locked/approved jobs too, on purpose — a case going out of
+// commission or a post-approval staffing swap doesn't care whether the
+// month was already locked, and this only ever touches equipment_case, never
+// staff_id, so it can't undo an approved staffing decision.
+//
+// mode "fillOnly" only writes a case into a Photographer slot that doesn't
+// have one yet (equipment_case === "") — safe to run any time, matches
+// Adi's "leave the cases as is" choice for everything already assigned.
+// mode "reassignAll" recomputes and overwrites every Photographer slot in
+// scope, matches her "reassign" choice.
+export async function assignCasesForScope(scope: CaseAssignScope, mode: "fillOnly" | "reassignAll"): Promise<AssignCasesResult> {
+  const [allJobs, staff, equipmentCaseRows, allAssignments] = await Promise.all([
+    getJobs(),
+    getStaff(),
+    getEquipmentCases(),
+    getScheduleAssignments(),
+  ]);
+
+  const inScope = (date: string) =>
+    scope.kind === "month" ? date.startsWith(scope.month.slice(0, 7)) : date >= scope.weekStart && date <= addDays(scope.weekStart, 6);
+
+  const jobs = allJobs
+    .map((j) => ({ ...j, picture_days: j.picture_days.filter((d) => inScope(d.date)) }))
+    .filter((j) => j.picture_days.length > 0);
+
+  const jobDays = flattenJobDays(jobs);
+  const pictureDayIds = new Set(jobDays.map((jd) => jd.id));
+  const assignmentsInScope = allAssignments.filter((a) => pictureDayIds.has(a.picture_day_id));
+
+  const schedule = buildScheduleFromAssignments(jobDays, assignmentsInScope);
+  const activeCaseNumbers = equipmentCaseRows.filter((c) => c.active).map((c) => c.case_number);
+  // Same low-priority-on-tie treatment as generateAndSaveSchedule used to
+  // apply inline — see assignEquipmentCases' own comment for why.
+  const lowPriorityStaffIds = new Set(staff.filter((s) => s.name === "Adi" || s.name === "Julia").map((s) => s.id));
+  const computed = assignEquipmentCases(schedule, activeCaseNumbers, lowPriorityStaffIds);
+
+  const photographerRows = assignmentsInScope.filter((a) => a.role === "Photographer");
+  const supabase = await createClient();
+  let updated = 0;
+
+  for (const row of photographerRows) {
+    const hasExisting = row.equipment_case !== "";
+    if (mode === "fillOnly" && hasExisting) continue;
+
+    const newCase = computed.get(`${row.picture_day_id}_${row.slot_index}`);
+    const newValue = newCase !== undefined ? String(newCase) : "";
+    if (newValue === row.equipment_case) continue;
+
+    const { error } = await supabase.from("schedule_assignments").update({ equipment_case: newValue }).eq("id", row.id);
+    if (error) throw new Error("Couldn't update case assignments — please try again.");
+    updated++;
+  }
+
+  revalidatePath("/schedule");
+  return { updated, total: photographerRows.length };
 }
 
 export async function setAssignmentCase(assignmentId: string, jobId: string, equipmentCase: string) {
