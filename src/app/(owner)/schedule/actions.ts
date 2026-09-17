@@ -215,10 +215,13 @@ export async function assignCasesForScope(scope: CaseAssignScope, mode: "fillOnl
   return { updated, total: photographerRows.length };
 }
 
-export async function setAssignmentCase(assignmentId: string, jobId: string, equipmentCase: string) {
+// Deliberately not gated by the job's locked flag — locking protects WHO's
+// assigned (see toggleJobLock), but equipment cases are meant to stay
+// editable regardless, same as assignCasesForScope's bulk Assign/Reassign
+// Cases buttons already are. Fixing a case on a locked job shouldn't require
+// unlocking it first.
+export async function setAssignmentCase(assignmentId: string, equipmentCase: string) {
   const supabase = await createClient();
-  const { data: job } = await supabase.from("jobs").select("locked").eq("id", jobId).single();
-  if (job?.locked) throw new Error("This job is locked — unlock it on the Jobs page to make changes.");
 
   const { error } = await supabase
     .from("schedule_assignments")
