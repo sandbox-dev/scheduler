@@ -300,8 +300,20 @@ export function assignEquipmentCases(
 
   const photographerSlots = Object.values(schedule).flatMap((slot) =>
     slot.assignments.Photographer
-      .map((staffId, slotIndex) => ({ date: slot.date, pictureDayId: slot.id, slotIndex, staffId }))
-      .filter((s): s is { date: string; pictureDayId: string; slotIndex: number; staffId: string } => !!s.staffId)
+      .map((staffId, slotIndex) => ({
+        date: slot.date,
+        pictureDayId: slot.id,
+        slotIndex,
+        staffId,
+        // Adi, 2026-09-17: the dedicated group photographer needs their own
+        // case — if there aren't enough active cases to go around some day,
+        // they should be the last one left without, not the first (they're
+        // the one slot that specifically needs the group-shot equipment).
+        isGroupSlot: isGroupPhotoSlot(slot, "Photographer", slotIndex),
+      }))
+      .filter(
+        (s): s is { date: string; pictureDayId: string; slotIndex: number; staffId: string; isGroupSlot: boolean } => !!s.staffId
+      )
   );
 
   groupByWeek(photographerSlots).forEach(([, weekSlots]) => {
@@ -315,11 +327,14 @@ export function assignEquipmentCases(
     const weeklyCaseByStaff = new Map<string, number>();
 
     [...byDate.keys()].sort().forEach((date) => {
-      // Regular staff get first crack at their usual case (or the lowest
-      // free one); a low-priority staffId only loses a tie because it's
-      // considered after everyone else has already claimed theirs.
+      // The dedicated group photographer claims a case before anyone else
+      // today (see isGroupSlot above); after that, regular staff get first
+      // crack at their usual case (or the lowest free one), and a
+      // low-priority staffId only loses a tie because it's considered last.
       const slotsToday = [...byDate.get(date)!].sort(
-        (a, b) => Number(lowPriorityStaffIds.has(a.staffId)) - Number(lowPriorityStaffIds.has(b.staffId))
+        (a, b) =>
+          Number(b.isGroupSlot) - Number(a.isGroupSlot) ||
+          Number(lowPriorityStaffIds.has(a.staffId)) - Number(lowPriorityStaffIds.has(b.staffId))
       );
       const usedToday = new Set<number>();
       const unresolved: typeof slotsToday = [];

@@ -73,7 +73,7 @@ export function ScheduleSlotCard({
       )}
       {isGroupSlot && (
         <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--rose)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-          Group photo
+          Group Photographer
         </div>
       )}
       {assigned ? (
