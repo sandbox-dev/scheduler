@@ -55,7 +55,7 @@ html, body { background: var(--bg); color: var(--ink); font-family: 'Inter', san
 .btn-rose:hover { filter: brightness(0.97); }
 .btn-rose:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.field-input, .field-select, .field-textarea { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 9px 11px; font-size: 13.5px; font-family: 'Inter', sans-serif; width: 100%; color: var(--ink); }
+.field-input, .field-select, .field-textarea { border: 1px solid transparent; background: #fff; border-radius: 10px; padding: 9px 11px; font-size: 13.5px; font-family: 'Inter', sans-serif; width: 100%; color: var(--ink); }
 .field-input:focus, .field-select:focus, .field-textarea:focus { outline: none; border-color: var(--navy); }
 
 /* Reads as plain text at rest — same box size as .field-input (transparent

@@ -52,6 +52,23 @@ export async function updateStaffField(
   revalidatePath("/schedule");
 }
 
+// Sets (or clears, when value is null) a per-role priority override for one
+// role, leaving every other role's override in the map untouched — mirrors
+// the read-then-write pattern of toggleStaffRole/toggleStaffCategory below,
+// since role_priority is a single jsonb column, not per-role rows.
+export async function updateStaffRolePriority(
+  staffId: string,
+  role: Role,
+  value: number,
+  current: Partial<Record<Role, number>>
+) {
+  const next = { ...current, [role]: value };
+  const supabase = await createClient();
+  await supabase.from("staff").update({ role_priority: next }).eq("id", staffId);
+  revalidatePath("/staff");
+  revalidatePath("/schedule");
+}
+
 export async function toggleStaffRole(staffId: string, role: Role, roles: Role[]) {
   const supabase = await createClient();
   const has = roles.includes(role);

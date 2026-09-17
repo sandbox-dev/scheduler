@@ -4,6 +4,7 @@ import {
   isGroupPhotoSlot,
   requiredQualificationsFor,
   distanceFor,
+  effectivePriority,
   roleCandidates,
   generateSchedule,
   assignEquipmentCases,
@@ -148,6 +149,7 @@ function makeStaff(overrides: Partial<Staff>): Staff {
     roles: [],
     categories: [],
     priority: 1,
+    role_priority: {},
     distance_miles: 0,
     location: "",
     phone: "",
@@ -177,6 +179,20 @@ describe("roleCandidates", () => {
   it("excludes inactive staff from every role, including Trainee", () => {
     const ids = roleCandidates(staff, "Trainee").map((s) => s.id);
     expect(ids).not.toContain("inactive");
+  });
+});
+
+describe("effectivePriority", () => {
+  it("falls back to the plain priority field when no per-role override exists", () => {
+    const s = makeStaff({ priority: 3, role_priority: {} });
+    expect(effectivePriority(s, "Photographer")).toBe(3);
+    expect(effectivePriority(s, "Assistant")).toBe(3);
+  });
+
+  it("uses the per-role override only for that specific role", () => {
+    const s = makeStaff({ priority: 3, role_priority: { Assistant: 5 } });
+    expect(effectivePriority(s, "Assistant")).toBe(5);
+    expect(effectivePriority(s, "Photographer")).toBe(3);
   });
 });
 
@@ -325,6 +341,54 @@ describe("generateSchedule", () => {
     // two plain setup slots instead.
     expect(slot.assignments.Photographer[2]).toBe("group-specialist");
     expect(slot.assignments.Photographer.slice(0, 2).sort()).toEqual(["generalist1", "generalist2"]);
+  });
+
+  it("a per-role priority override outranks a higher plain priority for that role only", () => {
+    const job = makeJob({
+      picture_days: [
+        {
+          id: "pd1",
+          job_id: "job1",
+          date: "2026-09-10",
+          setups: 1,
+          round_trip_miles: 0,
+          requires_supervisor: false,
+          is_outdoor: false,
+          has_group_photo: false,
+          is_babies: false,
+          has_trainee: false,
+          needs_review: false,
+          photographer_adjustment: 0,
+          assistant_adjustment: 0,
+          supervisor_adjustment: 0,
+        },
+      ],
+    });
+
+    const staff = [
+      makeStaff({ id: "high-base", roles: ["Photographer"], categories: ["K-12"], priority: 3 }),
+      makeStaff({
+        id: "low-base-high-override",
+        roles: ["Photographer"],
+        categories: ["K-12"],
+        priority: 1,
+        role_priority: { Photographer: 5 },
+      }),
+    ];
+
+    const availability: Availability[] = staff.map((s) => ({
+      staff_id: s.id,
+      picture_day_id: "pd1",
+      available: true,
+    }));
+
+    const schedule = generateSchedule([job], staff, availability);
+    const slot = schedule["job1_2026-09-10"];
+
+    // Plain priority alone would pick "high-base" (3 > 1), but the
+    // Photographer-specific override raises the other candidate's
+    // effective priority to 5, so they win the single slot instead.
+    expect(slot.assignments.Photographer[0]).toBe("low-base-high-override");
   });
 
   it("never double-books the same staff member across two jobs on the same date", () => {

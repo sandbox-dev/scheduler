@@ -78,6 +78,12 @@ export type Staff = {
   roles: Role[];
   categories: Qualification[];
   priority: number;
+  // Per-role override on top of the plain `priority` above — e.g. someone
+  // who should be booked early as a Photographer but late as an Assistant.
+  // Only set for roles an owner has explicitly overridden on the Staff
+  // page; any role missing from this map falls back to `priority` (see
+  // effectivePriority() in scheduling.ts).
+  role_priority: Partial<Record<Role, number>>;
   distance_miles: number;
   location: string;
   phone: string;
