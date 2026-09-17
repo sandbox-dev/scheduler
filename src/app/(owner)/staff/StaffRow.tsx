@@ -4,7 +4,14 @@ import { useTransition } from "react";
 import { CategoryToggleChip, RoleToggleChip } from "@/components/ui";
 import { SavableField } from "@/components/SavableField";
 import { QUALIFICATIONS, ROLES, type Staff } from "@/lib/types";
-import { setStaffActive, setStaffMileageEligible, toggleStaffCategory, toggleStaffRole, updateStaffField } from "./actions";
+import {
+  setStaffActive,
+  setStaffMileageEligible,
+  toggleStaffCategory,
+  toggleStaffRole,
+  updateStaffField,
+  updateStaffRolePriority,
+} from "./actions";
 
 export function StaffRow({ staff }: { staff: Staff }) {
   const [, startTransition] = useTransition();
@@ -65,19 +72,47 @@ export function StaffRow({ staff }: { staff: Staff }) {
         />
       </td>
       <td>
-        <input
-          type="number"
-          min={1}
-          max={5}
-          className="field-input"
-          style={{ width: 60 }}
-          defaultValue={staff.priority}
-          onBlur={(e) =>
-            startTransition(() =>
-              updateStaffField(staff.id, "priority", Math.min(5, Math.max(1, parseInt(e.target.value, 10) || 1)))
-            )
-          }
-        />
+        {staff.roles.length > 1 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {staff.roles.map((role) => (
+              <div key={role} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{ fontSize: 10.5, color: "var(--muted)", width: 68 }}>{role}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  className="field-input"
+                  style={{ width: 46 }}
+                  defaultValue={staff.role_priority[role] ?? staff.priority}
+                  onBlur={(e) =>
+                    startTransition(() =>
+                      updateStaffRolePriority(
+                        staff.id,
+                        role,
+                        Math.min(5, Math.max(1, parseInt(e.target.value, 10) || 1)),
+                        staff.role_priority
+                      )
+                    )
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <input
+            type="number"
+            min={1}
+            max={5}
+            className="field-input"
+            style={{ width: 60 }}
+            defaultValue={staff.priority}
+            onBlur={(e) =>
+              startTransition(() =>
+                updateStaffField(staff.id, "priority", Math.min(5, Math.max(1, parseInt(e.target.value, 10) || 1)))
+              )
+            }
+          />
+        )}
       </td>
       <td>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>

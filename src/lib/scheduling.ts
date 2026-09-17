@@ -168,6 +168,16 @@ export function roleCandidates(staff: Staff[], role: Role) {
   return active.filter((s) => s.roles.includes(role));
 }
 
+// A staff member's priority is normally the same no matter which role
+// they're filling — the plain `priority` field. This only diverges when an
+// owner has set a per-role override on the Staff page (e.g. someone who
+// should be booked early as a Photographer but late as an Assistant).
+// Trainee is never overridden here since it isn't a tagged role at all
+// (see roleCandidates) — it always falls back to the plain field.
+export function effectivePriority(s: Staff, role: Role): number {
+  return s.role_priority?.[role] ?? s.priority;
+}
+
 export type ScheduleSlot = FlatJobDay & {
   slotKey: string;
   assignments: Record<Role, (string | null)[]>;
@@ -210,7 +220,7 @@ export function generateSchedule(
         .filter((s) => !usedPerDate[jd.date].has(s.id))
         .sort(
           (a, b) =>
-            b.priority - a.priority ||
+            effectivePriority(b, role) - effectivePriority(a, role) ||
             distanceFor(a, jd.schoolId, distanceMap) - distanceFor(b, jd.schoolId, distanceMap)
         );
 

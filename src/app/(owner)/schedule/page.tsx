@@ -13,6 +13,7 @@ import {
   buildDistanceMap,
   buildStaffScheduleRows,
   distanceFor,
+  effectivePriority,
   flattenJobDays,
   fmtDate,
   isGroupPhotoSlot,
@@ -386,7 +387,7 @@ export default async function SchedulePage({
                                 ? {
                                     id: s.id,
                                     name: s.name,
-                                    priority: s.priority,
+                                    priority: effectivePriority(s, role as Role),
                                     distance_miles: distanceFor(s, jd.schoolId, distanceMap),
                                     available: availableSet.has(`${s.id}_${jd.id}`),
                                   }
@@ -395,7 +396,7 @@ export default async function SchedulePage({
                             options={options.map((o) => ({
                               id: o.id,
                               name: o.name,
-                              priority: o.priority,
+                              priority: effectivePriority(o, role as Role),
                               distance_miles: distanceFor(o, jd.schoolId, distanceMap),
                               available: availableSet.has(`${o.id}_${jd.id}`),
                             }))}

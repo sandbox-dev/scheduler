@@ -668,3 +668,12 @@ create table if not exists availability_send_log (
 alter table availability_send_log enable row level security;
 drop policy if exists "owners full access" on availability_send_log;
 create policy "owners full access" on availability_send_log for all to authenticated using (true) with check (true);
+
+-- Per-role priority override, on top of the plain `priority` column — e.g.
+-- someone who should be booked early as a Photographer but later as an
+-- Assistant. Keyed by role name (e.g. {"Assistant": 2}); any role missing
+-- from the map falls back to the plain `priority` field (see
+-- effectivePriority() in src/lib/scheduling.ts). Empty by default so every
+-- existing staff member keeps behaving exactly as before until an owner
+-- explicitly sets an override.
+alter table staff add column if not exists role_priority jsonb not null default '{}'::jsonb;
