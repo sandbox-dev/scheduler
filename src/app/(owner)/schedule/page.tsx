@@ -344,62 +344,83 @@ export default async function SchedulePage({
                     </div>
 
                     {ROLES.filter((r) => jd.crew[r] > 0).map((role) => {
-                      const roleRows = dayAssignments
+                      const allRoleRows = dayAssignments
                         .filter((a) => a.role === role)
                         .sort((a, b) => a.slot_index - b.slot_index);
+                      // The dedicated group photographer gets pulled into its
+                      // own section below, separate from the regular
+                      // Photographer group — Adi, 2026-09-17: "that needs to
+                      // be a clear spot on the scheduler now, i'm not sure
+                      // it's showing" — a small tag buried in a wall of
+                      // regular photographer cards wasn't clear enough.
+                      const groupRow = allRoleRows.find((a) => isGroupPhotoSlot(jd, role as Role, a.slot_index));
+                      const roleRows = groupRow ? allRoleRows.filter((a) => a.id !== groupRow.id) : allRoleRows;
+                      const roleCount = jd.crew[role] - (groupRow ? 1 : 0);
+
+                      const renderSlot = (a: (typeof allRoleRows)[number]) => {
+                        const s = a.staff_id ? staffById.get(a.staff_id) : null;
+                        const required = requiredQualificationsFor(jd, role as Role, a.slot_index);
+                        const options = roleCandidates(staff, role as Role).filter((o) =>
+                          required.every((q) => o.categories.includes(q))
+                        );
+                        const isGroupSlot = isGroupPhotoSlot(jd, role as Role, a.slot_index);
+                        const conflictEntries = s ? staffDateAssignments.get(`${s.id}_${jd.date}`) || [] : [];
+                        const conflictWith = conflictEntries
+                          .filter((e) => e.assignmentId !== a.id)
+                          .map((e) => `${e.jobName} (${e.role})`);
+                        return (
+                          <ScheduleSlotCard
+                            key={a.id}
+                            pictureDayId={jd.id}
+                            jobId={jd.jobId}
+                            role={role as Role}
+                            slotIndex={a.slot_index}
+                            isGroupSlot={isGroupSlot}
+                            assignmentId={a.id}
+                            equipmentCase={a.equipment_case}
+                            activeCaseNumbers={activeCaseNumbers}
+                            conflictWith={conflictWith}
+                            locked={lockedJobIds.has(jd.jobId)}
+                            assigned={
+                              s
+                                ? {
+                                    id: s.id,
+                                    name: s.name,
+                                    priority: s.priority,
+                                    distance_miles: distanceFor(s, jd.schoolId, distanceMap),
+                                    available: availableSet.has(`${s.id}_${jd.id}`),
+                                  }
+                                : null
+                            }
+                            options={options.map((o) => ({
+                              id: o.id,
+                              name: o.name,
+                              priority: o.priority,
+                              distance_miles: distanceFor(o, jd.schoolId, distanceMap),
+                              available: availableSet.has(`${o.id}_${jd.id}`),
+                            }))}
+                          />
+                        );
+                      };
 
                       return (
-                        <div key={role} style={{ marginBottom: 10 }}>
-                          <div style={{ marginBottom: 6 }}>
-                            <RoleTag role={role as Role} extra={` (${jd.crew[role]})`} />
-                          </div>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                            {roleRows.map((a) => {
-                              const s = a.staff_id ? staffById.get(a.staff_id) : null;
-                              const required = requiredQualificationsFor(jd, role as Role, a.slot_index);
-                              const options = roleCandidates(staff, role as Role).filter((o) =>
-                                required.every((q) => o.categories.includes(q))
-                              );
-                              const isGroupSlot = isGroupPhotoSlot(jd, role as Role, a.slot_index);
-                              const conflictEntries = s ? staffDateAssignments.get(`${s.id}_${jd.date}`) || [] : [];
-                              const conflictWith = conflictEntries
-                                .filter((e) => e.assignmentId !== a.id)
-                                .map((e) => `${e.jobName} (${e.role})`);
-                              return (
-                                <ScheduleSlotCard
-                                  key={a.id}
-                                  pictureDayId={jd.id}
-                                  jobId={jd.jobId}
-                                  role={role as Role}
-                                  slotIndex={a.slot_index}
-                                  isGroupSlot={isGroupSlot}
-                                  assignmentId={a.id}
-                                  equipmentCase={a.equipment_case}
-                                  activeCaseNumbers={activeCaseNumbers}
-                                  conflictWith={conflictWith}
-                                  locked={lockedJobIds.has(jd.jobId)}
-                                  assigned={
-                                    s
-                                      ? {
-                                          id: s.id,
-                                          name: s.name,
-                                          priority: s.priority,
-                                          distance_miles: distanceFor(s, jd.schoolId, distanceMap),
-                                          available: availableSet.has(`${s.id}_${jd.id}`),
-                                        }
-                                      : null
-                                  }
-                                  options={options.map((o) => ({
-                                    id: o.id,
-                                    name: o.name,
-                                    priority: o.priority,
-                                    distance_miles: distanceFor(o, jd.schoolId, distanceMap),
-                                    available: availableSet.has(`${o.id}_${jd.id}`),
-                                  }))}
-                                />
-                              );
-                            })}
-                          </div>
+                        <div key={role}>
+                          {roleCount > 0 && (
+                            <div style={{ marginBottom: 10 }}>
+                              <div style={{ marginBottom: 6 }}>
+                                <RoleTag role={role as Role} extra={` (${roleCount})`} />
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{roleRows.map(renderSlot)}</div>
+                            </div>
+                          )}
+                          {groupRow && (
+                            <div style={{ marginBottom: 10 }}>
+                              <div style={{ marginBottom: 6 }}>
+                                <RoleTag role={role as Role} label="Group Photographer" />
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{renderSlot(groupRow)}</div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

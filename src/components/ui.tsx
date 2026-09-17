@@ -45,14 +45,14 @@ const ROLE_ICON: Record<Role, typeof Camera> = {
   Trainee: GraduationCap,
 };
 
-export function RoleTag({ role, extra }: { role: Role; extra?: string }) {
+export function RoleTag({ role, label, extra }: { role: Role; label?: string; extra?: string }) {
   const Icon = ROLE_ICON[role];
   return (
     <span
       className="role-tag"
       style={{ background: `color-mix(in srgb, ${ROLE_COLOR[role]} 14%, white)`, color: ROLE_COLOR[role] }}
     >
-      <Icon size={12} /> {role}
+      <Icon size={12} /> {label ?? role}
       {extra}
     </span>
   );

@@ -465,6 +465,35 @@ describe("assignEquipmentCases", () => {
     expect(new Set(cases.values()).size).toBe(3);
   });
 
+  // Adi, 2026-09-17: "they need their own case" — when there aren't enough
+  // active cases to go around, the dedicated group photographer should be
+  // the LAST one left without, not the first, since they're the one slot
+  // that specifically needs the group-shot equipment.
+  it("gives the group-photo slot priority for a case over a regular slot when cases run short", () => {
+    const job = makeJob({
+      picture_days: [
+        {
+          id: "pd1", job_id: "job1", date: "2026-09-10", setups: 1, round_trip_miles: 0,
+          requires_supervisor: false, is_outdoor: false, has_group_photo: true, is_babies: false,
+          has_trainee: false, needs_review: false, photographer_adjustment: 0, assistant_adjustment: 0, supervisor_adjustment: 0,
+        },
+      ],
+    });
+    const staff = [
+      makeStaff({ id: "p1", roles: ["Photographer"], categories: ["K-12"] }),
+      makeStaff({ id: "p2", roles: ["Photographer"], categories: ["K-12", "Group Photography"] }),
+    ];
+    const availability: Availability[] = staff.map((s) => ({ staff_id: s.id, picture_day_id: "pd1", available: true }));
+
+    const schedule = generateSchedule([job], staff, availability);
+    // Group-photo slot fills first (AGENTS.md §4), so p2 (the only one
+    // Group-Photography-qualified) lands on slot_index 1 — see isGroupPhotoSlot.
+    const cases = assignEquipmentCases(schedule, [1]); // only one active case, two photographers
+
+    expect(cases.size).toBe(1);
+    expect(cases.get("pd1_1")).toBe(1); // the group slot (index 1 = setups), not slot 0
+  });
+
   // The auto-generator itself never double-books someone across two jobs the
   // same day (AGENTS.md §4, usedPerDate) — this only happens via a manual
   // reassignment, which §5 says CAN double-book, on purpose, flagged not
