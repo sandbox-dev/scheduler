@@ -129,9 +129,9 @@ export function ScheduleSlotCard({
         <select
           className="field-select"
           style={{ marginTop: 6, fontSize: 11.5, padding: "5px 7px" }}
-          disabled={pending || locked}
+          disabled={pending}
           value={equipmentCase}
-          onChange={(e) => startTransition(() => setAssignmentCase(assignmentId, jobId, e.target.value))}
+          onChange={(e) => startTransition(() => setAssignmentCase(assignmentId, e.target.value))}
         >
           <option value="">Case — none</option>
           {caseOptions.map((n) => (
