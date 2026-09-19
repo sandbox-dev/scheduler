@@ -90,7 +90,7 @@ export async function createJob(_prevState: CreateJobState, formData: FormData):
 
 export async function updateJobField(
   jobId: string,
-  field: "school_type" | "enrollment",
+  field: "school_type" | "enrollment" | "reference_photos_url",
   value: string | number | null
 ) {
   const supabase = await createClient();
@@ -99,6 +99,7 @@ export async function updateJobField(
     .update({ [field]: value })
     .eq("id", jobId);
   revalidatePath("/jobs");
+  if (field === "reference_photos_url") revalidatePath("/crew");
 }
 
 export async function toggleJobLock(jobId: string, locked: boolean) {

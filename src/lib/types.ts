@@ -48,6 +48,9 @@ export type Job = {
   // When true, Regenerate skips this job and its Schedule slots are
   // read-only until unlocked. Set automatically when a month is approved.
   locked: boolean;
+  // Link to the school's existing shared Google Drive folder for setup/
+  // reference photos — shown on the staff view. Owner-set only.
+  reference_photos_url: string | null;
 };
 
 export type PictureDay = {
