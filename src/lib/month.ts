@@ -11,6 +11,11 @@ export function currentMonthFirstDay() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
+export function todayStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 export function shiftMonth(month: string, delta: number) {
   const d = new Date(month + "T00:00:00");
   d.setMonth(d.getMonth() + delta);

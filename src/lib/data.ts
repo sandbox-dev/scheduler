@@ -4,11 +4,13 @@ import type {
   Availability,
   EquipmentCase,
   JobWithDays,
+  Role,
   School,
   ScheduleAssignment,
   Staff,
   StaffSchoolDistance,
 } from "@/lib/types";
+import type { StaffPortalTimelineFields } from "@/lib/staffPortal";
 
 export async function getSchools(): Promise<School[]> {
   const supabase = await createClient();
@@ -169,6 +171,143 @@ export async function getTimelineBuilderJobIds(schedulerJobIds: string[]): Promi
     return new Map((data || []).map((r) => [r.scheduler_job_id as string, r.id as string]));
   } catch (err) {
     console.error("getTimelineBuilderJobIds failed — hiding the timeline links", err);
+    return new Map();
+  }
+}
+
+// ---------- Staff portal (mobile staff view) ----------
+// Every read below relies on the staff-scoped RLS policies added alongside
+// staff.auth_user_id (see supabase/schema.sql) — a staff-scoped login can
+// only ever get back their own staff row, their own assignments, and the
+// picture_days/jobs/schools those assignments reference, so there's no
+// extra filtering needed here beyond what makes the query useful.
+
+export type StaffPortalAccount = { id: string; name: string };
+
+// The logged-in staff-scoped user's own staff row, or null if this login
+// isn't linked to one (shouldn't normally happen — the proxy only routes a
+// linked account here — but fails closed rather than showing anyone else's
+// data).
+export async function getMyStaffAccount(): Promise<StaffPortalAccount | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("staff")
+    .select("id, name")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return data as StaffPortalAccount | null;
+}
+
+export type StaffPortalAssignment = {
+  id: string;
+  role: Role;
+  equipment_case: string;
+  picture_day: { id: string; date: string };
+  job: { id: string; name: string; reference_photos_url: string | null };
+  school: { name: string; address: string } | null;
+};
+
+// Every Picture Day this staff member is assigned to, from fromDate through
+// toDate inclusive (both YYYY-MM-DD) — the staff view's own "today through
+// this week" window. Flat separate queries + join in JS, same pattern as
+// getJobs()/getScheduleAssignments() above.
+export async function getMyAssignments(
+  staffId: string,
+  fromDate: string,
+  toDate: string
+): Promise<StaffPortalAssignment[]> {
+  const supabase = await createClient();
+
+  const { data: assignments, error: assignmentsError } = await supabase
+    .from("schedule_assignments")
+    .select("id, role, equipment_case, picture_day_id, job_id")
+    .eq("staff_id", staffId);
+  if (assignmentsError) throw assignmentsError;
+  if (!assignments || assignments.length === 0) return [];
+
+  const pictureDayIds = [...new Set(assignments.map((a) => a.picture_day_id))];
+  const jobIds = [...new Set(assignments.map((a) => a.job_id))];
+
+  const [{ data: pictureDays, error: pdError }, { data: jobs, error: jobsError }] = await Promise.all([
+    supabase.from("picture_days").select("id, date").in("id", pictureDayIds),
+    supabase.from("jobs").select("id, name, school_id, reference_photos_url").in("id", jobIds),
+  ]);
+  if (pdError) throw pdError;
+  if (jobsError) throw jobsError;
+
+  const schoolIds = [...new Set((jobs || []).map((j) => j.school_id).filter((id): id is string => !!id))];
+  const { data: schools, error: schoolsError } = schoolIds.length
+    ? await supabase.from("schools").select("id, name, address").in("id", schoolIds)
+    : { data: [] as { id: string; name: string; address: string }[], error: null };
+  if (schoolsError) throw schoolsError;
+
+  const pictureDayById = new Map((pictureDays || []).map((pd) => [pd.id as string, pd]));
+  const jobById = new Map((jobs || []).map((j) => [j.id as string, j]));
+  const schoolById = new Map((schools || []).map((s) => [s.id as string, s]));
+
+  return assignments
+    .map((a): StaffPortalAssignment | null => {
+      const pictureDay = pictureDayById.get(a.picture_day_id);
+      const job = jobById.get(a.job_id);
+      if (!pictureDay || !job) return null;
+      if (pictureDay.date < fromDate || pictureDay.date > toDate) return null;
+      const school = job.school_id ? schoolById.get(job.school_id) ?? null : null;
+      return {
+        id: a.id,
+        role: a.role as Role,
+        equipment_case: a.equipment_case,
+        picture_day: { id: pictureDay.id, date: pictureDay.date },
+        job: { id: job.id, name: job.name, reference_photos_url: job.reference_photos_url },
+        school: school ? { name: school.name, address: school.address } : null,
+      };
+    })
+    .filter((a): a is StaffPortalAssignment => a !== null)
+    .sort((a, b) => a.picture_day.date.localeCompare(b.picture_day.date));
+}
+
+// Arrival/start/end come from Timeline Builder's own approved-or-sent
+// version snapshot, via a security-definer RPC that checks this staff
+// member's own assignments internally — see staff_portal_timeline_for_days
+// in supabase/schema.sql for exactly why this is an RPC and not a direct
+// cross-app table read. Fails closed to an empty map (every day just shows
+// "TBD") so a hiccup here can never take down the staff view.
+export async function getStaffPortalTimelineTimes(
+  pictureDayIds: string[]
+): Promise<Map<string, StaffPortalTimelineFields>> {
+  if (pictureDayIds.length === 0) return new Map();
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("staff_portal_timeline_for_days", {
+      p_picture_day_ids: pictureDayIds,
+    });
+    if (error) throw error;
+    return new Map(
+      (
+        data as {
+          picture_day_id: string;
+          school_start_time: string;
+          end_time: string;
+          photo_start_offset_minutes: number;
+          group_start_offset_minutes: number | null;
+        }[]
+      ).map((r) => [
+        r.picture_day_id,
+        {
+          school_start_time: r.school_start_time,
+          end_time: r.end_time,
+          photo_start_offset_minutes: r.photo_start_offset_minutes,
+          group_start_offset_minutes: r.group_start_offset_minutes,
+        },
+      ])
+    );
+  } catch (err) {
+    console.error("getStaffPortalTimelineTimes failed — showing TBD times", err);
     return new Map();
   }
 }

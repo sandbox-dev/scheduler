@@ -677,3 +677,326 @@ create policy "owners full access" on availability_send_log for all to authentic
 -- existing staff member keeps behaving exactly as before until an owner
 -- explicitly sets an override.
 alter table staff add column if not exists role_priority jsonb not null default '{}'::jsonb;
+
+-- A Google Drive link to the school's existing shared setup/reference
+-- photos folder — nullable, shown on both the owner Jobs page
+-- (ReferencePhotosInput) and the mobile staff view below. Only an owner can
+-- ever write it (see the staff-scoped write-blocking policies below); no
+-- staff-facing edit UI exists.
+alter table jobs add column if not exists reference_photos_url text;
+
+-- ---------- Staff portal: staff-scoped logins (read-only) ----------
+-- Everything above this point assumed "authenticated" means "an owner"
+-- (Adi/Julia) — true up to now, since the app never issued any other kind
+-- of login. This section adds a SECOND kind of authenticated account: a
+-- staff-scoped login (one per staff member using the mobile staff view)
+-- that must only ever see their OWN schedule, never anyone else's data, and
+-- can never write anything.
+--
+-- Rather than rewrite the "owners full access" policies above, this layers
+-- RESTRICTIVE policies on top of them. Postgres ANDs a restrictive policy
+-- against whatever permissive policy already granted access — so these can
+-- only ever narrow what an account can do, never widen it. An owner login
+-- (any authenticated user with no matching staff.auth_user_id row) sails
+-- through every one of them unaffected, since each restrictive check below
+-- starts with "not is_staff_account() or ...".
+
+alter table staff add column if not exists auth_user_id uuid references auth.users(id);
+alter table staff drop constraint if exists staff_auth_user_id_key;
+alter table staff add constraint staff_auth_user_id_key unique (auth_user_id);
+
+-- True for a staff-scoped login (an authenticated user linked to a staff
+-- row via auth_user_id), false for a normal owner login. security definer
+-- so it can read the staff table itself without recursing into the RLS
+-- policies below that call it.
+create or replace function is_staff_account()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (select 1 from staff where auth_user_id = auth.uid());
+$$;
+grant execute on function is_staff_account() to authenticated;
+
+-- The calling staff-scoped login's own staff.id, or null for an owner login
+-- (or for any authenticated user with no linked staff row at all). security
+-- definer for the same reason as is_staff_account().
+create or replace function current_staff_id()
+returns uuid
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select id from staff where auth_user_id = auth.uid() limit 1;
+$$;
+grant execute on function current_staff_id() to authenticated;
+
+-- staff: a staff-scoped login can read only their own row, and can never
+-- write anything at all (not even their own row) — editing stays an
+-- owner-only action from the Staff page.
+drop policy if exists "staff-scoped read own row" on staff;
+create policy "staff-scoped read own row" as restrictive on staff
+  for select to authenticated
+  using (not is_staff_account() or id = current_staff_id());
+
+drop policy if exists "staff-scoped no insert" on staff;
+create policy "staff-scoped no insert" as restrictive on staff
+  for insert to authenticated
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no update" on staff;
+create policy "staff-scoped no update" as restrictive on staff
+  for update to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no delete" on staff;
+create policy "staff-scoped no delete" as restrictive on staff
+  for delete to authenticated
+  using (not is_staff_account());
+
+-- schedule_assignments: a staff-scoped login can read only their own
+-- assignments (any job/date, so the staff view can show upcoming ones),
+-- never anyone else's, and can never write.
+drop policy if exists "staff-scoped read own assignments" on schedule_assignments;
+create policy "staff-scoped read own assignments" as restrictive on schedule_assignments
+  for select to authenticated
+  using (not is_staff_account() or staff_id = current_staff_id());
+
+drop policy if exists "staff-scoped no insert" on schedule_assignments;
+create policy "staff-scoped no insert" as restrictive on schedule_assignments
+  for insert to authenticated
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no update" on schedule_assignments;
+create policy "staff-scoped no update" as restrictive on schedule_assignments
+  for update to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no delete" on schedule_assignments;
+create policy "staff-scoped no delete" as restrictive on schedule_assignments
+  for delete to authenticated
+  using (not is_staff_account());
+
+-- picture_days: a staff-scoped login can read only a Picture Day they're
+-- actually assigned to (via schedule_assignments), never any other job's
+-- days, and can never write.
+drop policy if exists "staff-scoped read own picture days" on picture_days;
+create policy "staff-scoped read own picture days" as restrictive on picture_days
+  for select to authenticated
+  using (
+    not is_staff_account()
+    or exists (
+      select 1 from schedule_assignments sa
+      where sa.picture_day_id = picture_days.id and sa.staff_id = current_staff_id()
+    )
+  );
+
+drop policy if exists "staff-scoped no insert" on picture_days;
+create policy "staff-scoped no insert" as restrictive on picture_days
+  for insert to authenticated
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no update" on picture_days;
+create policy "staff-scoped no update" as restrictive on picture_days
+  for update to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no delete" on picture_days;
+create policy "staff-scoped no delete" as restrictive on picture_days
+  for delete to authenticated
+  using (not is_staff_account());
+
+-- jobs: same idea — only a job a staff-scoped login is actually assigned to
+-- (schedule_assignments already carries job_id directly), read-only.
+drop policy if exists "staff-scoped read own jobs" on jobs;
+create policy "staff-scoped read own jobs" as restrictive on jobs
+  for select to authenticated
+  using (
+    not is_staff_account()
+    or exists (
+      select 1 from schedule_assignments sa
+      where sa.job_id = jobs.id and sa.staff_id = current_staff_id()
+    )
+  );
+
+drop policy if exists "staff-scoped no insert" on jobs;
+create policy "staff-scoped no insert" as restrictive on jobs
+  for insert to authenticated
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no update" on jobs;
+create policy "staff-scoped no update" as restrictive on jobs
+  for update to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no delete" on jobs;
+create policy "staff-scoped no delete" as restrictive on jobs
+  for delete to authenticated
+  using (not is_staff_account());
+
+-- schools: only a school behind a job a staff-scoped login is assigned to
+-- (for the address shown on the staff view), read-only.
+drop policy if exists "staff-scoped read own schools" on schools;
+create policy "staff-scoped read own schools" as restrictive on schools
+  for select to authenticated
+  using (
+    not is_staff_account()
+    or exists (
+      select 1 from jobs j
+      join schedule_assignments sa on sa.job_id = j.id
+      where j.school_id = schools.id and sa.staff_id = current_staff_id()
+    )
+  );
+
+drop policy if exists "staff-scoped no insert" on schools;
+create policy "staff-scoped no insert" as restrictive on schools
+  for insert to authenticated
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no update" on schools;
+create policy "staff-scoped no update" as restrictive on schools
+  for update to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no delete" on schools;
+create policy "staff-scoped no delete" as restrictive on schools
+  for delete to authenticated
+  using (not is_staff_account());
+
+-- Everything else a staff-scoped login has no legitimate reason to touch at
+-- all (their own past availability answers, other staff's distances,
+-- equipment cases, approvals, availability links/notes/send-log) — blocked
+-- outright, both read and write. A staff member's own upcoming
+-- assignments/times are served through staff_portal_timeline_for_days()
+-- below instead, which is narrowly scoped to exactly what the staff view
+-- needs.
+drop policy if exists "staff-scoped no access" on availability;
+create policy "staff-scoped no access" as restrictive on availability
+  for all to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no access" on availability_links;
+create policy "staff-scoped no access" as restrictive on availability_links
+  for all to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no access" on availability_notes;
+create policy "staff-scoped no access" as restrictive on availability_notes
+  for all to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no access" on availability_submissions;
+create policy "staff-scoped no access" as restrictive on availability_submissions
+  for all to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no access" on availability_send_log;
+create policy "staff-scoped no access" as restrictive on availability_send_log
+  for all to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no access" on schedule_approvals;
+create policy "staff-scoped no access" as restrictive on schedule_approvals
+  for all to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no access" on staff_school_distances;
+create policy "staff-scoped no access" as restrictive on staff_school_distances
+  for all to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no access" on equipment_cases;
+create policy "staff-scoped no access" as restrictive on equipment_cases
+  for all to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+-- ---------- Staff portal: cross-app timeline read (security definer) ----------
+-- Timeline Builder lives in the same Supabase project (see
+-- getTimelineBuilderJobIds in src/lib/data.ts) but its own tb_* tables carry
+-- the same "any authenticated user is a full owner" RLS this file used to
+-- assume everywhere — a staff-scoped login is a real authenticated user in
+-- that same project, so granting it any direct SELECT on tb_jobs/tb_days/
+-- tb_timeline_versions would hand it (and anyone else with an equally valid
+-- Supabase session) uncontrolled access to ALL of Timeline Builder's data,
+-- not just its own arrival/start/end time for its own Picture Days. This
+-- function avoids that: it's SECURITY DEFINER (bypasses RLS on the tables
+-- it reads internally), but only ever returns rows for a Picture Day the
+-- CALLER is actually assigned to (checked against schedule_assignments
+-- inside the function, never trusting the picture_day_ids argument on its
+-- own) — no new grant on any tb_* table is needed, and a staff-scoped login
+-- still has zero direct access to Timeline Builder's tables. Assumes
+-- Timeline Builder's own schema (tb_jobs, tb_timeline_versions) already
+-- exists in this project, same as getTimelineBuilderJobIds assumes.
+--
+-- Returns one row per requested Picture Day that (a) this staff member is
+-- actually assigned to, (b) has a matching Timeline Builder job
+-- (tb_jobs.scheduler_job_id), and (c) has a sent-or-approved timeline
+-- version whose snapshot includes that date — exactly the raw fields the
+-- app needs to compute arrival/start/end itself (see
+-- src/lib/staffPortal.ts), mirroring timeline-builder's own
+-- photoStartMinutes()/arrivalRange() arithmetic. A day with no such version
+-- (never sent/approved) simply isn't returned — the app shows "TBD" for it.
+create or replace function staff_portal_timeline_for_days(p_picture_day_ids uuid[])
+returns table(
+  picture_day_id uuid,
+  school_start_time time,
+  end_time time,
+  photo_start_offset_minutes integer,
+  group_start_offset_minutes integer
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_staff_id uuid;
+begin
+  select id into v_staff_id from staff where auth_user_id = auth.uid();
+  if v_staff_id is null then
+    return;
+  end if;
+
+  return query
+  select
+    pd.id,
+    (day.elem->>'school_start_time')::time,
+    (day.elem->>'end_time')::time,
+    (day.elem->>'photo_start_offset_minutes')::integer,
+    (day.elem->>'group_start_offset_minutes')::integer
+  from picture_days pd
+  join schedule_assignments sa on sa.picture_day_id = pd.id and sa.staff_id = v_staff_id
+  join tb_jobs tj on tj.scheduler_job_id = pd.job_id
+  join lateral (
+    select v.snapshot
+    from tb_timeline_versions v
+    where v.job_id = tj.id and (v.approved_at is not null or v.reason = 'sent')
+    order by coalesce(v.approved_at, v.created_at) desc
+    limit 1
+  ) ver on true
+  join lateral (
+    select elem
+    from jsonb_array_elements(ver.snapshot) as elem
+    where (elem->>'event_date')::date = pd.date
+    limit 1
+  ) day on true
+  where pd.id = any(p_picture_day_ids);
+end;
+$$;
+
+grant execute on function staff_portal_timeline_for_days(uuid[]) to authenticated;
