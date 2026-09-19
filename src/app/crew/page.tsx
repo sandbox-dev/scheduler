@@ -1,13 +1,24 @@
 import Image from "next/image";
-import { Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, StickyNote } from "lucide-react";
+import { ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, StickyNote } from "lucide-react";
 import { Card, RoleTag } from "@/components/ui";
-import { getMyAssignments, getMyStaffAccount, getStaffPortalFullTimeline, getStaffPortalTimelineTimes } from "@/lib/data";
+import {
+  getMyAssignments,
+  getMyStaffAccount,
+  getStaffPortalBriefing,
+  getStaffPortalCrew,
+  getStaffPortalFullTimeline,
+  getStaffPortalTimelineTimes,
+  type StaffPortalAssignment,
+} from "@/lib/data";
 import { addDays, todayStr } from "@/lib/month";
 import {
   computeStaffPortalDayTimes,
   computeStaffPortalTimelineRows,
   formatClockRange,
   staffPortalArrivalRange,
+  staffPortalSchoolTypeLabel,
+  type StaffPortalBriefingFields,
+  type StaffPortalCrewMember,
   type StaffPortalScheduledBlock,
   type StaffPortalTimelineDay,
   type StaffPortalTimelineFields,
@@ -32,6 +43,101 @@ function TimeStat({ label, value }: { label: string; value: string }) {
       <div style={{ fontSize: 14.5, fontWeight: 700, marginTop: 2, color: value === "TBD" ? "var(--muted)" : "var(--ink)" }}>
         {value}
       </div>
+    </div>
+  );
+}
+
+// One labeled fact in the Day Briefing (Backdrop/Notes/Wifi) — short
+// label-over-text, same shape as the existing "Location Notes" box's own
+// inner label/value pair, just without that box's background tint (this
+// section already has its own "Day Briefing" heading, so a tint per fact
+// would be one visual weight too many).
+function BriefingFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 12.5, color: "var(--ink)", marginTop: 1 }}>{value}</div>
+    </div>
+  );
+}
+
+// The new section Adi asked for: the same facts currently hand-copied into
+// Pixifi's own event notes for staff to read there, shown natively and
+// formatted for a phone screen instead of a raw copy-paste block. Rendered
+// inline (not a collapsible <details> like Full Timeline below) — a
+// handful of short facts plus a short crew list reads fine on one screen,
+// unlike the long block-by-block timeline that section exists to hide by
+// default.
+function DayBriefingSection({
+  job,
+  pictureDay,
+  briefing,
+  crew,
+}: {
+  job: StaffPortalAssignment["job"];
+  pictureDay: StaffPortalAssignment["picture_day"];
+  briefing: StaffPortalBriefingFields | null;
+  crew: StaffPortalCrewMember[];
+}) {
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          marginBottom: 6,
+          fontSize: 11,
+          fontWeight: 700,
+          color: "var(--muted)",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+        }}
+      >
+        <ClipboardList size={12} /> Day Briefing
+      </div>
+
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+        <TimeStat label="School Type" value={staffPortalSchoolTypeLabel(job)} />
+        <TimeStat label="Setups" value={String(pictureDay.setups)} />
+        <TimeStat label="Location" value={pictureDay.is_outdoor ? "Outdoor" : "Indoor"} />
+      </div>
+
+      {briefing?.backdrop && <BriefingFact label="Backdrop" value={briefing.backdrop} />}
+      {briefing?.notes && <BriefingFact label="Notes" value={briefing.notes} />}
+      {briefing?.wifi_network && (
+        <BriefingFact
+          label="Wifi"
+          value={briefing.wifi_password ? `${briefing.wifi_network} — ${briefing.wifi_password}` : briefing.wifi_network}
+        />
+      )}
+
+      {crew.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: "var(--navy)",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              marginBottom: 4,
+            }}
+          >
+            Crew
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {crew.map((member, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                <RoleTag role={member.role} />
+                <span>{member.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -219,9 +325,11 @@ export default async function CrewPage() {
   const weekEnd = addDays(today, 6);
   const assignments = await getMyAssignments(account.id, today, weekEnd);
   const pictureDayIds = assignments.map((a) => a.picture_day.id);
-  const [timelineTimes, fullTimelines] = await Promise.all([
+  const [timelineTimes, fullTimelines, briefings, crews] = await Promise.all([
     getStaffPortalTimelineTimes(pictureDayIds),
     getStaffPortalFullTimeline(pictureDayIds),
+    getStaffPortalBriefing(pictureDayIds),
+    getStaffPortalCrew(pictureDayIds),
   ]);
   const firstName = account.name.split(" ")[0];
 
@@ -314,6 +422,13 @@ export default async function CrewPage() {
                   <TimeStat label="Start" value={times.start} />
                   <TimeStat label="End" value={times.end} />
                 </div>
+
+                <DayBriefingSection
+                  job={a.job}
+                  pictureDay={a.picture_day}
+                  briefing={briefings.get(a.picture_day.id) ?? null}
+                  crew={crews.get(a.picture_day.id) ?? []}
+                />
 
                 <FullTimelineSection timelineFields={fields} fullDay={fullTimelines.get(a.picture_day.id) ?? null} />
 

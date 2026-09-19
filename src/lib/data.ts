@@ -10,7 +10,13 @@ import type {
   Staff,
   StaffSchoolDistance,
 } from "@/lib/types";
-import type { StaffPortalTimelineDay, StaffPortalTimelineFields } from "@/lib/staffPortal";
+import type {
+  StaffPortalBriefingFields,
+  StaffPortalCrewMember,
+  StaffPortalTimelineDay,
+  StaffPortalTimelineFields,
+} from "@/lib/staffPortal";
+import { sortStaffPortalCrew } from "@/lib/staffPortal";
 
 export async function getSchools(): Promise<School[]> {
   const supabase = await createClient();
@@ -208,8 +214,8 @@ export type StaffPortalAssignment = {
   id: string;
   role: Role;
   equipment_case: string;
-  picture_day: { id: string; date: string };
-  job: { id: string; name: string; reference_photos_url: string | null };
+  picture_day: { id: string; date: string; setups: number; is_outdoor: boolean };
+  job: { id: string; name: string; reference_photos_url: string | null; category: string; school_type: string };
   school: { name: string; address: string; staff_notes: string | null } | null;
 };
 
@@ -235,8 +241,8 @@ export async function getMyAssignments(
   const jobIds = [...new Set(assignments.map((a) => a.job_id))];
 
   const [{ data: pictureDays, error: pdError }, { data: jobs, error: jobsError }] = await Promise.all([
-    supabase.from("picture_days").select("id, date").in("id", pictureDayIds),
-    supabase.from("jobs").select("id, name, school_id, reference_photos_url").in("id", jobIds),
+    supabase.from("picture_days").select("id, date, setups, is_outdoor").in("id", pictureDayIds),
+    supabase.from("jobs").select("id, name, school_id, reference_photos_url, category, school_type").in("id", jobIds),
   ]);
   if (pdError) throw pdError;
   if (jobsError) throw jobsError;
@@ -262,8 +268,14 @@ export async function getMyAssignments(
         id: a.id,
         role: a.role as Role,
         equipment_case: a.equipment_case,
-        picture_day: { id: pictureDay.id, date: pictureDay.date },
-        job: { id: job.id, name: job.name, reference_photos_url: job.reference_photos_url },
+        picture_day: { id: pictureDay.id, date: pictureDay.date, setups: pictureDay.setups, is_outdoor: pictureDay.is_outdoor },
+        job: {
+          id: job.id,
+          name: job.name,
+          reference_photos_url: job.reference_photos_url,
+          category: job.category,
+          school_type: job.school_type,
+        },
         school: school ? { name: school.name, address: school.address, staff_notes: school.staff_notes } : null,
       };
     })
@@ -338,6 +350,74 @@ export async function getStaffPortalFullTimeline(
     );
   } catch (err) {
     console.error("getStaffPortalFullTimeline failed — hiding the full timeline", err);
+    return new Map();
+  }
+}
+
+// The full crew (name + role) for each Picture Day — every OTHER staff
+// member also assigned that day, not just this login's own row, via
+// staff_portal_crew_for_days() in supabase/schema.sql (see that function's
+// own comment for why this needs a security-definer RPC rather than a
+// wider policy). Pre-sorted (Supervisor/Photographer/Assistant/Trainee,
+// then name) so the Day Briefing section never has to re-sort client-side.
+// Fails closed to an empty map — a hiccup here just means the crew list is
+// hidden for that day, not that the whole page breaks.
+export async function getStaffPortalCrew(
+  pictureDayIds: string[]
+): Promise<Map<string, StaffPortalCrewMember[]>> {
+  if (pictureDayIds.length === 0) return new Map();
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("staff_portal_crew_for_days", {
+      p_picture_day_ids: pictureDayIds,
+    });
+    if (error) throw error;
+    const byDay = new Map<string, StaffPortalCrewMember[]>();
+    for (const row of data as { picture_day_id: string; staff_name: string; role: Role }[]) {
+      const list = byDay.get(row.picture_day_id) ?? [];
+      list.push({ name: row.staff_name, role: row.role });
+      byDay.set(row.picture_day_id, list);
+    }
+    for (const [day, list] of byDay) byDay.set(day, sortStaffPortalCrew(list));
+    return byDay;
+  } catch (err) {
+    console.error("getStaffPortalCrew failed — hiding the crew list", err);
+    return new Map();
+  }
+}
+
+// Backdrop / wifi / day-of notes for each Picture Day, straight off
+// Timeline Builder's tb_jobs row for that job — via
+// staff_portal_briefing_for_days() in supabase/schema.sql. A day with no
+// linked Timeline Builder job at all just isn't returned (map lookup comes
+// back undefined, same "nothing to show" handling as the timeline maps
+// above). Fails closed to an empty map on any error.
+export async function getStaffPortalBriefing(
+  pictureDayIds: string[]
+): Promise<Map<string, StaffPortalBriefingFields>> {
+  if (pictureDayIds.length === 0) return new Map();
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("staff_portal_briefing_for_days", {
+      p_picture_day_ids: pictureDayIds,
+    });
+    if (error) throw error;
+    return new Map(
+      (
+        data as {
+          picture_day_id: string;
+          backdrop: string | null;
+          wifi_network: string | null;
+          wifi_password: string | null;
+          notes: string | null;
+        }[]
+      ).map((r) => [
+        r.picture_day_id,
+        { backdrop: r.backdrop, wifi_network: r.wifi_network, wifi_password: r.wifi_password, notes: r.notes },
+      ])
+    );
+  } catch (err) {
+    console.error("getStaffPortalBriefing failed — hiding the briefing", err);
     return new Map();
   }
 }
