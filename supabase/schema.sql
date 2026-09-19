@@ -1193,13 +1193,49 @@ grant execute on function staff_portal_crew_for_days(uuid[]) to authenticated;
 -- timeline yet can still show its briefing. A field blank on tb_jobs comes
 -- back null (nullif) rather than an empty string, so the app can tell
 -- "nothing entered" apart from a real empty answer with a single check.
+--
+-- Extended 2026-09-19 for full Pixifi Event Info parity (Adi wants the
+-- Pixifi panel eventually deletable with nothing lost): individual_photo_
+-- location, dress_code_note, and additional_gear_notes are three more
+-- plain tb_jobs columns, added the same way as backdrop/wifi above.
+--
+-- custom_fields is the interesting one — Adi's free-form "extra facts"
+-- list. It is NOT simply tb_jobs.pixifi_custom_fields: timeline-builder
+-- replaced that flat per-job list with tb_schools.pixifi_custom_fields,
+-- keyed by picture-day type ("Fall"/"Spring"/"Graduation"/"MUD"), because
+-- the same school's answer can differ by season (Adi's own example: a
+-- school's Group Photo Location is the cafeteria in fall, the gym in
+-- spring — see tb_schools.pixifi_custom_fields's own comment in
+-- timeline-builder's schema.sql). A job with no linked school, or no
+-- determinable picture-day type yet, falls back to its own flat
+-- tb_jobs.pixifi_custom_fields instead. This mirrors
+-- pixifiFieldTypeForJob() in timeline-builder's src/lib/pixifiEventInfo.ts
+-- exactly, field for field:
+--   - tj.is_graduation true -> "Graduation"
+--   - else tj.is_makeup_day true -> "MUD"
+--   - else look at the EARLIEST tb_days.event_date across the whole job
+--     (not just this one Picture Day — a multi-day job is scoped by its
+--     first day, same as timeline-builder's own earliestDate) — month
+--     August (8) or later -> "Fall", else -> "Spring"
+--   - no date at all and neither flag set -> no type, so custom_fields
+--     falls back to the job's own flat list, same as timeline-builder's
+--     "job.school_id && fieldType" check.
+-- When a type IS determined and the job has a school, the result is
+-- ts.pixifi_custom_fields -> that type, defaulting to an empty array if
+-- that key was never added for that school/season (never falling back to
+-- the job's own flat list in that case) — same as timeline-builder's own
+-- `school?.pixifi_custom_fields[fieldType] ?? []`.
 create or replace function staff_portal_briefing_for_days(p_picture_day_ids uuid[])
 returns table(
   picture_day_id uuid,
   backdrop text,
   wifi_network text,
   wifi_password text,
-  notes text
+  notes text,
+  individual_photo_location text,
+  dress_code_note text,
+  additional_gear_notes text,
+  custom_fields jsonb
 )
 language plpgsql
 security definer
@@ -1214,16 +1250,50 @@ begin
   end if;
 
   return query
+  with base as (
+    select
+      pd.id as picture_day_id,
+      tj.backdrop,
+      tj.wifi_network,
+      tj.wifi_password,
+      tj.internal_notes,
+      tj.individual_photo_location,
+      tj.dress_code_note,
+      tj.additional_gear_notes,
+      tj.school_id,
+      tj.pixifi_custom_fields as job_custom_fields,
+      ts.pixifi_custom_fields as school_custom_fields,
+      case
+        when tj.is_graduation then 'Graduation'
+        when tj.is_makeup_day then 'MUD'
+        when earliest_day.d is null then null
+        when extract(month from earliest_day.d) >= 8 then 'Fall'
+        else 'Spring'
+      end as field_type
+    from picture_days pd
+    join schedule_assignments sa on sa.picture_day_id = pd.id and sa.staff_id = v_staff_id
+    join tb_jobs tj on tj.scheduler_job_id = pd.job_id
+    left join tb_schools ts on ts.id = tj.school_id
+    left join lateral (
+      select min(td.event_date) as d from tb_days td where td.job_id = tj.id
+    ) earliest_day on true
+    where pd.id = any(p_picture_day_ids)
+  )
   select
-    pd.id,
-    nullif(tj.backdrop, ''),
-    nullif(tj.wifi_network, ''),
-    nullif(tj.wifi_password, ''),
-    nullif(tj.internal_notes, '')
-  from picture_days pd
-  join schedule_assignments sa on sa.picture_day_id = pd.id and sa.staff_id = v_staff_id
-  join tb_jobs tj on tj.scheduler_job_id = pd.job_id
-  where pd.id = any(p_picture_day_ids);
+    b.picture_day_id,
+    nullif(b.backdrop, ''),
+    nullif(b.wifi_network, ''),
+    nullif(b.wifi_password, ''),
+    nullif(b.internal_notes, ''),
+    nullif(b.individual_photo_location, ''),
+    nullif(b.dress_code_note, ''),
+    nullif(b.additional_gear_notes, ''),
+    case
+      when b.school_id is not null and b.field_type is not null
+        then coalesce(b.school_custom_fields -> b.field_type, '[]'::jsonb)
+      else coalesce(b.job_custom_fields, '[]'::jsonb)
+    end as custom_fields
+  from base b;
 end;
 $$;
 

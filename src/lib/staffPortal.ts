@@ -326,17 +326,35 @@ export function computeStaffPortalTimelineRows(day: StaffPortalTimelineDay): Sta
 
 export type StaffPortalCrewMember = { name: string; role: Role };
 
+// One row of Adi's free-form "extra facts" list — same {id, label, value}
+// shape as timeline-builder's own CustomField (src/lib/types.ts there),
+// already resolved server-side to this job's actual picture-day type (see
+// staff_portal_briefing_for_days()'s own comment in supabase/schema.sql).
+export type StaffPortalCustomField = { id: string; label: string; value: string };
+
 // The raw fields staff_portal_briefing_for_days() returns for one Picture
 // Day — straight off timeline-builder's tb_jobs row for that job, or all
 // null if there's no linked Timeline Builder job at all. Each field is
 // independently null when nothing's been entered, not just when the whole
-// row is missing.
+// row is missing. custom_fields is always an array (possibly empty), never
+// null — see that function's comment for exactly how it's resolved.
 export type StaffPortalBriefingFields = {
   backdrop: string | null;
   wifi_network: string | null;
   wifi_password: string | null;
   notes: string | null;
+  individual_photo_location: string | null;
+  dress_code_note: string | null;
+  additional_gear_notes: string | null;
+  custom_fields: StaffPortalCustomField[];
 };
+
+// A custom field Adi added with no value filled in yet shouldn't clutter
+// the Day Briefing — same "only show a fact if it has a real value" rule
+// every other fact in that section already follows.
+export function visibleStaffPortalCustomFields(fields: StaffPortalCustomField[]): StaffPortalCustomField[] {
+  return fields.filter((f) => f.value.trim() !== "");
+}
 
 // Supervisor, then Photographer, then Assistant, then Trainee — mirrors
 // timeline-builder's own Pixifi Event Info staff-list ordering (ROLE_ORDER

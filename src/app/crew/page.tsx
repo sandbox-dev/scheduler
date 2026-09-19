@@ -17,6 +17,7 @@ import {
   formatClockRange,
   staffPortalArrivalRange,
   staffPortalSchoolTypeLabel,
+  visibleStaffPortalCustomFields,
   type StaffPortalBriefingFields,
   type StaffPortalCrewMember,
   type StaffPortalScheduledBlock,
@@ -105,7 +106,12 @@ function DayBriefingSection({
         <TimeStat label="Location" value={pictureDay.is_outdoor ? "Outdoor" : "Indoor"} />
       </div>
 
+      {briefing?.individual_photo_location && (
+        <BriefingFact label="Individual Photo Location" value={briefing.individual_photo_location} />
+      )}
       {briefing?.backdrop && <BriefingFact label="Backdrop" value={briefing.backdrop} />}
+      {briefing?.dress_code_note && <BriefingFact label="Dress Code" value={briefing.dress_code_note} />}
+      {briefing?.additional_gear_notes && <BriefingFact label="Additional Gear" value={briefing.additional_gear_notes} />}
       {briefing?.notes && <BriefingFact label="Notes" value={briefing.notes} />}
       {briefing?.wifi_network && (
         <BriefingFact
@@ -113,6 +119,9 @@ function DayBriefingSection({
           value={briefing.wifi_password ? `${briefing.wifi_network} — ${briefing.wifi_password}` : briefing.wifi_network}
         />
       )}
+      {briefing && visibleStaffPortalCustomFields(briefing.custom_fields).map((f) => (
+        <BriefingFact key={f.id} label={f.label} value={f.value} />
+      ))}
 
       {crew.length > 0 && (
         <div style={{ marginTop: 8 }}>
