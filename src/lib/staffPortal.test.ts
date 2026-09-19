@@ -15,6 +15,7 @@ import {
   staffPortalArrivalRange,
   sortStaffPortalCrew,
   staffPortalSchoolTypeLabel,
+  visibleStaffPortalCustomFields,
   type StaffPortalBlock,
   type StaffPortalTimelineDay,
   type StaffPortalScheduledBlock,
@@ -367,6 +368,39 @@ describe("sortStaffPortalCrew", () => {
     const original = [...crew];
     sortStaffPortalCrew(crew);
     expect(crew).toEqual(original);
+  });
+});
+
+describe("visibleStaffPortalCustomFields", () => {
+  it("drops a field with a blank value", () => {
+    const fields = [
+      { id: "1", label: "Group Photo Location", value: "" },
+      { id: "2", label: "Parking", value: "Lot B" },
+    ];
+    expect(visibleStaffPortalCustomFields(fields).map((f) => f.id)).toEqual(["2"]);
+  });
+
+  it("drops a field whose value is only whitespace", () => {
+    const fields = [{ id: "1", label: "Group Photo Location", value: "   " }];
+    expect(visibleStaffPortalCustomFields(fields)).toEqual([]);
+  });
+
+  it("keeps every field when all have real values", () => {
+    const fields = [
+      { id: "1", label: "Group Photo Location", value: "Gym" },
+      { id: "2", label: "Parking", value: "Lot B" },
+    ];
+    expect(visibleStaffPortalCustomFields(fields)).toEqual(fields);
+  });
+
+  it("does not mutate the input array", () => {
+    const fields = [
+      { id: "1", label: "A", value: "" },
+      { id: "2", label: "B", value: "x" },
+    ];
+    const original = [...fields];
+    visibleStaffPortalCustomFields(fields);
+    expect(fields).toEqual(original);
   });
 });
 

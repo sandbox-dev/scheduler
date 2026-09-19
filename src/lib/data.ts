@@ -386,12 +386,15 @@ export async function getStaffPortalCrew(
   }
 }
 
-// Backdrop / wifi / day-of notes for each Picture Day, straight off
-// Timeline Builder's tb_jobs row for that job — via
-// staff_portal_briefing_for_days() in supabase/schema.sql. A day with no
-// linked Timeline Builder job at all just isn't returned (map lookup comes
-// back undefined, same "nothing to show" handling as the timeline maps
-// above). Fails closed to an empty map on any error.
+// Backdrop / wifi / day-of notes / full Pixifi Event Info parity fields for
+// each Picture Day, straight off Timeline Builder's tb_jobs (and, for
+// custom_fields, tb_schools) rows for that job — via
+// staff_portal_briefing_for_days() in supabase/schema.sql, which also does
+// the picture-day-type resolution for custom_fields server-side (see that
+// function's own comment for exactly how). A day with no linked Timeline
+// Builder job at all just isn't returned (map lookup comes back undefined,
+// same "nothing to show" handling as the timeline maps above). Fails
+// closed to an empty map on any error.
 export async function getStaffPortalBriefing(
   pictureDayIds: string[]
 ): Promise<Map<string, StaffPortalBriefingFields>> {
@@ -410,10 +413,23 @@ export async function getStaffPortalBriefing(
           wifi_network: string | null;
           wifi_password: string | null;
           notes: string | null;
+          individual_photo_location: string | null;
+          dress_code_note: string | null;
+          additional_gear_notes: string | null;
+          custom_fields: { id: string; label: string; value: string }[] | null;
         }[]
       ).map((r) => [
         r.picture_day_id,
-        { backdrop: r.backdrop, wifi_network: r.wifi_network, wifi_password: r.wifi_password, notes: r.notes },
+        {
+          backdrop: r.backdrop,
+          wifi_network: r.wifi_network,
+          wifi_password: r.wifi_password,
+          notes: r.notes,
+          individual_photo_location: r.individual_photo_location,
+          dress_code_note: r.dress_code_note,
+          additional_gear_notes: r.additional_gear_notes,
+          custom_fields: r.custom_fields ?? [],
+        },
       ])
     );
   } catch (err) {
