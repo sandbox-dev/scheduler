@@ -685,6 +685,34 @@ alter table staff add column if not exists role_priority jsonb not null default 
 -- staff-facing edit UI exists.
 alter table jobs add column if not exists reference_photos_url text;
 
+-- Free-text notes tied to the SCHOOL (parking, gate codes, entry
+-- instructions, "check in at the front office" etc.) — reusable every time
+-- crew works that location, unlike a job-specific note. Adi, 2026-09-19:
+-- staff-only, never shown to the school. That's naturally true here, not
+-- just an RLS rule: this app's `schools` table is never read by
+-- timeline-builder's school-facing approval/portal pages at all (they read
+-- only their own tb_* tables — see staff_portal_timeline_for_days below for
+-- the one place the two apps' data cross, and it doesn't touch this
+-- column). Owner-editable from the Jobs page's Saved Schools panel
+-- (SchoolsPanel.tsx); read-only on the staff view (/crew).
+--
+-- On RLS: no new policy was needed for this column. Postgres row-level
+-- security filters entire ROWS, not individual columns — the existing
+-- "staff-scoped read own schools" policy above already lets a staff-scoped
+-- login SELECT the full row of any school behind a job they're assigned
+-- to, so a plain new column on that same table is automatically included
+-- in that same read. True column-level hiding would need a column
+-- GRANT/REVOKE or a security-definer view carved down to specific columns —
+-- neither is needed here because there's no principal in this database
+-- that can read `schools` and should NOT see staff_notes: owners see
+-- everything by design, staff-scoped logins are meant to see it (that's
+-- the whole point of this column), and the school itself has no login here
+-- at all (see above). If a future column on `schools` ever needs to be
+-- hidden from staff-scoped logins specifically, that would need one of
+-- those real column-level mechanisms — a RESTRICTIVE row policy can't do
+-- it, since it can only block whole rows.
+alter table schools add column if not exists staff_notes text;
+
 -- ---------- Staff portal: staff-scoped logins (read-only) ----------
 -- Everything above this point assumed "authenticated" means "an owner"
 -- (Adi/Julia) — true up to now, since the app never issued any other kind
@@ -1000,3 +1028,75 @@ end;
 $$;
 
 grant execute on function staff_portal_timeline_for_days(uuid[]) to authenticated;
+
+-- ---------- Staff portal: full block-level timeline (security definer) ----------
+-- Same idea and same security shape as staff_portal_timeline_for_days above
+-- (re-read that function's comment first) — this exists because the staff
+-- view originally only showed the day's 4 summary times (arrival/start/end),
+-- and Adi asked for staff to be able to see the ACTUAL full schedule (every
+-- block: class, room/teacher, time) — the same real timeline the school
+-- sees on its approval page, not just a summary.
+--
+-- Rather than pick out a hand-picked set of scalar columns (like the
+-- function above does for 4 fields), this returns the WHOLE matched day
+-- object out of the snapshot as one jsonb value — the exact same
+-- `TimelineVersionSnapshotDay` shape timeline-builder itself stores
+-- (event_date, timing fields, and the full `blocks` array). Returning it
+-- whole means a field added to that shape later doesn't need a matching
+-- change here to keep flowing through (the same reason `get_job_for_approval`
+-- sends `to_jsonb(d)` rather than named columns on timeline-builder's own
+-- side — see ApprovalView.tsx's own comment there). The scheduler app's own
+-- TypeScript (src/lib/staffPortal.ts) picks out just the fields it knows how
+-- to render and re-implements timeline-builder's block-scheduling arithmetic
+-- against them — same "separate deployments, no shared package" reasoning as
+-- the summary-times function.
+--
+-- Security invariant, unchanged from the function above: this NEVER trusts
+-- p_picture_day_ids on its own. Every row returned still has to satisfy the
+-- same picture_days -> schedule_assignments(this caller's own staff id) ->
+-- tb_jobs -> tb_timeline_versions chain — a staff-scoped login still cannot
+-- pass an arbitrary picture_day_id (their own or a guess) and get back
+-- another Picture Day's timeline, and still has zero direct grant on any
+-- tb_* table.
+create or replace function staff_portal_full_timeline_for_days(p_picture_day_ids uuid[])
+returns table(
+  picture_day_id uuid,
+  day_snapshot jsonb
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_staff_id uuid;
+begin
+  select id into v_staff_id from staff where auth_user_id = auth.uid();
+  if v_staff_id is null then
+    return;
+  end if;
+
+  return query
+  select
+    pd.id,
+    day.elem
+  from picture_days pd
+  join schedule_assignments sa on sa.picture_day_id = pd.id and sa.staff_id = v_staff_id
+  join tb_jobs tj on tj.scheduler_job_id = pd.job_id
+  join lateral (
+    select v.snapshot
+    from tb_timeline_versions v
+    where v.job_id = tj.id and (v.approved_at is not null or v.reason = 'sent')
+    order by coalesce(v.approved_at, v.created_at) desc
+    limit 1
+  ) ver on true
+  join lateral (
+    select elem
+    from jsonb_array_elements(ver.snapshot) as elem
+    where (elem->>'event_date')::date = pd.date
+    limit 1
+  ) day on true
+  where pd.id = any(p_picture_day_ids);
+end;
+$$;
+
+grant execute on function staff_portal_full_timeline_for_days(uuid[]) to authenticated;
