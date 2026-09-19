@@ -32,6 +32,11 @@ export type School = {
   address: string;
   round_trip_miles: number;
   address_unresolvable: boolean;
+  // Free-text, staff-only (parking, gate codes, entry instructions) — never
+  // shown to the school. See the column's own comment in supabase/schema.sql
+  // for why no extra RLS was needed for that. Null/empty means nothing's
+  // been entered yet.
+  staff_notes: string | null;
 };
 
 export type Job = {

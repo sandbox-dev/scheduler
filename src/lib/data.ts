@@ -10,7 +10,7 @@ import type {
   Staff,
   StaffSchoolDistance,
 } from "@/lib/types";
-import type { StaffPortalTimelineFields } from "@/lib/staffPortal";
+import type { StaffPortalTimelineDay, StaffPortalTimelineFields } from "@/lib/staffPortal";
 
 export async function getSchools(): Promise<School[]> {
   const supabase = await createClient();
@@ -210,7 +210,7 @@ export type StaffPortalAssignment = {
   equipment_case: string;
   picture_day: { id: string; date: string };
   job: { id: string; name: string; reference_photos_url: string | null };
-  school: { name: string; address: string } | null;
+  school: { name: string; address: string; staff_notes: string | null } | null;
 };
 
 // Every Picture Day this staff member is assigned to, from fromDate through
@@ -243,8 +243,8 @@ export async function getMyAssignments(
 
   const schoolIds = [...new Set((jobs || []).map((j) => j.school_id).filter((id): id is string => !!id))];
   const { data: schools, error: schoolsError } = schoolIds.length
-    ? await supabase.from("schools").select("id, name, address").in("id", schoolIds)
-    : { data: [] as { id: string; name: string; address: string }[], error: null };
+    ? await supabase.from("schools").select("id, name, address, staff_notes").in("id", schoolIds)
+    : { data: [] as { id: string; name: string; address: string; staff_notes: string | null }[], error: null };
   if (schoolsError) throw schoolsError;
 
   const pictureDayById = new Map((pictureDays || []).map((pd) => [pd.id as string, pd]));
@@ -264,7 +264,7 @@ export async function getMyAssignments(
         equipment_case: a.equipment_case,
         picture_day: { id: pictureDay.id, date: pictureDay.date },
         job: { id: job.id, name: job.name, reference_photos_url: job.reference_photos_url },
-        school: school ? { name: school.name, address: school.address } : null,
+        school: school ? { name: school.name, address: school.address, staff_notes: school.staff_notes } : null,
       };
     })
     .filter((a): a is StaffPortalAssignment => a !== null)
@@ -308,6 +308,36 @@ export async function getStaffPortalTimelineTimes(
     );
   } catch (err) {
     console.error("getStaffPortalTimelineTimes failed — showing TBD times", err);
+    return new Map();
+  }
+}
+
+// The full block-level schedule (every class/room/time) for each Picture
+// Day, straight off the same sent-or-approved Timeline Builder snapshot as
+// getStaffPortalTimelineTimes above — via a separate security-definer RPC
+// (staff_portal_full_timeline_for_days in supabase/schema.sql) that returns
+// the whole matched day as jsonb rather than 4 scalar fields, since the
+// staff view now needs the real blocks, not just the summary times. Same
+// security shape (re-verifies the caller's own assignment server-side) and
+// same fail-closed behavior: a hiccup here just means "View Full Timeline"
+// shows nothing for that day rather than taking down the whole page.
+export async function getStaffPortalFullTimeline(
+  pictureDayIds: string[]
+): Promise<Map<string, StaffPortalTimelineDay>> {
+  if (pictureDayIds.length === 0) return new Map();
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("staff_portal_full_timeline_for_days", {
+      p_picture_day_ids: pictureDayIds,
+    });
+    if (error) throw error;
+    return new Map(
+      (data as { picture_day_id: string; day_snapshot: StaffPortalTimelineDay | null }[])
+        .filter((r) => r.day_snapshot)
+        .map((r) => [r.picture_day_id, r.day_snapshot as StaffPortalTimelineDay])
+    );
+  } catch (err) {
+    console.error("getStaffPortalFullTimeline failed — hiding the full timeline", err);
     return new Map();
   }
 }
