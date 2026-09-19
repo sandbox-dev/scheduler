@@ -7,6 +7,8 @@
 // staff_portal_timeline_for_days() in supabase/schema.sql for where these
 // raw fields come from.
 
+import type { Role } from "@/lib/types";
+
 // The raw fields staff_portal_timeline_for_days() returns for one Picture
 // Day, straight off that job's sent-or-approved timeline snapshot.
 export type StaffPortalTimelineFields = {
@@ -315,6 +317,51 @@ export function applyStaffPortalArrivalGrouping(blocks: StaffPortalScheduledBloc
 // arrival-grouped rows, ready to render top to bottom.
 export function computeStaffPortalTimelineRows(day: StaffPortalTimelineDay): StaffPortalScheduledBlock[] {
   return applyStaffPortalArrivalGrouping(orderStaffPortalRows(computeStaffPortalBlockTimes(day)));
+}
+
+// ---------- Day Briefing (crew list + Pixifi Event Info facts) ----------
+// See staff_portal_crew_for_days() / staff_portal_briefing_for_days() in
+// supabase/schema.sql for where these come from and the security shape
+// that guards them.
+
+export type StaffPortalCrewMember = { name: string; role: Role };
+
+// The raw fields staff_portal_briefing_for_days() returns for one Picture
+// Day — straight off timeline-builder's tb_jobs row for that job, or all
+// null if there's no linked Timeline Builder job at all. Each field is
+// independently null when nothing's been entered, not just when the whole
+// row is missing.
+export type StaffPortalBriefingFields = {
+  backdrop: string | null;
+  wifi_network: string | null;
+  wifi_password: string | null;
+  notes: string | null;
+};
+
+// Supervisor, then Photographer, then Assistant, then Trainee — mirrors
+// timeline-builder's own Pixifi Event Info staff-list ordering (ROLE_ORDER
+// in pixifiEventInfo.ts) so the same crew reads in the same order whichever
+// app shows it, rather than whatever order the database happens to return
+// rows in. Alphabetical by name within a role, for a stable order when two
+// people share a role.
+const CREW_ROLE_ORDER: Role[] = ["Supervisor", "Photographer", "Assistant", "Trainee"];
+function crewRoleRank(role: Role): number {
+  const i = CREW_ROLE_ORDER.indexOf(role);
+  return i === -1 ? CREW_ROLE_ORDER.length : i;
+}
+
+export function sortStaffPortalCrew(crew: StaffPortalCrewMember[]): StaffPortalCrewMember[] {
+  return [...crew].sort((a, b) => crewRoleRank(a.role) - crewRoleRank(b.role) || a.name.localeCompare(b.name));
+}
+
+// The finer-grained school_type (e.g. "TK-8", "Pre-8", "High School") is
+// more informative for a staff member glancing at a briefing than the plain
+// Preschool/K-12 scheduling category, so it wins when both are set — see
+// Job.school_type's own comment in src/lib/types.ts ("reference only, never
+// used for scheduling"). Falls back to category when school_type hasn't
+// been filled in, so the section never renders blank.
+export function staffPortalSchoolTypeLabel(job: { category: string; school_type: string }): string {
+  return job.school_type.trim() || job.category;
 }
 
 // "8:50–9:00 AM" / "11:45 AM–12:00 PM" — mirrors timeline-builder's own

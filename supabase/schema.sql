@@ -1100,3 +1100,131 @@ end;
 $$;
 
 grant execute on function staff_portal_full_timeline_for_days(uuid[]) to authenticated;
+
+-- ---------- Staff portal: Day Briefing (crew list + Pixifi Event Info) ----------
+-- Adi wants a new "Day Briefing" section on /crew showing the same facts
+-- currently hand-copied into Pixifi's own event notes for staff to read
+-- there (see timeline-builder's src/lib/pixifiEventInfo.ts). Three of the
+-- facts she asked for — school type, setups count, indoor/outdoor — are
+-- already plain columns on THIS app's own jobs/picture_days tables
+-- (jobs.category/school_type, picture_days.setups/is_outdoor) and need no
+-- new function or policy: Postgres RLS filters whole ROWS, not individual
+-- columns (see staff_notes' own comment further up this file for the same
+-- point made in detail), and the existing "staff-scoped read own jobs"/
+-- "staff-scoped read own picture days" policies above already let a
+-- staff-scoped login SELECT the full row of any job/day it's actually
+-- assigned to — so those three facts just needed to be added to what
+-- src/lib/data.ts already selects, nothing here. The two facts below are
+-- different: one is genuinely new ACCESS (not just a wider column list),
+-- and the other lives on a table this app has no grant on at all — each
+-- gets its own narrow SECURITY DEFINER function, same shape as the two
+-- timeline functions above.
+
+-- Full crew list (name + role) for a Picture Day. A staff-scoped login can
+-- normally only read ITS OWN staff row / ITS OWN assignments (see
+-- "staff-scoped read own row" / "staff-scoped read own assignments" above,
+-- both intentionally that narrow) — Adi wants a staff member to
+-- additionally see who ELSE is working the same Picture Day ("who's staff
+-- for the day"). That's real new access, not a column-visibility question,
+-- so it goes through a SECURITY DEFINER function rather than a wider
+-- policy — same bypass-RLS-internally shape as is_staff_account()/
+-- current_staff_id() above, but only ever returns rows for a Picture Day
+-- the CALLER is independently proven to be assigned to, via a self-join
+-- back onto schedule_assignments — never trusting p_picture_day_ids on its
+-- own, same invariant as staff_portal_timeline_for_days. Returns ONLY name
+-- + role, nothing else on staff (no phone/email/pin/distance/priority) — a
+-- coworker has a real reason to know who else is on the shoot, never a
+-- reason to see anyone else's contact info or pay-relevant fields.
+create or replace function staff_portal_crew_for_days(p_picture_day_ids uuid[])
+returns table(
+  picture_day_id uuid,
+  staff_name text,
+  role text
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_staff_id uuid;
+begin
+  select id into v_staff_id from staff where auth_user_id = auth.uid();
+  if v_staff_id is null then
+    return;
+  end if;
+
+  return query
+  select
+    sa.picture_day_id,
+    s.name,
+    sa.role
+  from schedule_assignments sa
+  join staff s on s.id = sa.staff_id
+  where sa.picture_day_id = any(p_picture_day_ids)
+    and exists (
+      select 1
+      from schedule_assignments mine
+      where mine.picture_day_id = sa.picture_day_id
+        and mine.staff_id = v_staff_id
+    )
+  order by sa.picture_day_id, sa.role, s.name;
+end;
+$$;
+
+grant execute on function staff_portal_crew_for_days(uuid[]) to authenticated;
+
+-- Backdrop / wifi / day-of notes for a Picture Day. These live entirely on
+-- Timeline Builder's own tb_jobs table (backdrop, wifi_network,
+-- wifi_password, internal_notes columns — added for its "Pixifi Event
+-- Info panel", one row per JOB, not per day, same as every other Pixifi
+-- Event Info field — see that project's own supabase/schema.sql). Same
+-- reasoning as staff_portal_timeline_for_days above for why this can't be
+-- a direct grant on tb_jobs: a staff-scoped login is a real authenticated
+-- user in this same Supabase project, and tb_jobs' own RLS still assumes
+-- "any authenticated user is a full owner" — granting direct SELECT would
+-- hand it every job's full Pixifi Event Info, not just its own. This
+-- function is SECURITY DEFINER for that reason, and re-verifies the
+-- caller's own assignment server-side via the same picture_days ->
+-- schedule_assignments (this caller's own staff id) -> tb_jobs chain the
+-- comment above describes, never trusting p_picture_day_ids on its own.
+-- Unlike the two timeline functions above, there's no tb_timeline_versions
+-- snapshot involved at all here — these fields sit directly on tb_jobs
+-- regardless of whether a timeline has ever been sent, so a day with no
+-- timeline yet can still show its briefing. A field blank on tb_jobs comes
+-- back null (nullif) rather than an empty string, so the app can tell
+-- "nothing entered" apart from a real empty answer with a single check.
+create or replace function staff_portal_briefing_for_days(p_picture_day_ids uuid[])
+returns table(
+  picture_day_id uuid,
+  backdrop text,
+  wifi_network text,
+  wifi_password text,
+  notes text
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_staff_id uuid;
+begin
+  select id into v_staff_id from staff where auth_user_id = auth.uid();
+  if v_staff_id is null then
+    return;
+  end if;
+
+  return query
+  select
+    pd.id,
+    nullif(tj.backdrop, ''),
+    nullif(tj.wifi_network, ''),
+    nullif(tj.wifi_password, ''),
+    nullif(tj.internal_notes, '')
+  from picture_days pd
+  join schedule_assignments sa on sa.picture_day_id = pd.id and sa.staff_id = v_staff_id
+  join tb_jobs tj on tj.scheduler_job_id = pd.job_id
+  where pd.id = any(p_picture_day_ids);
+end;
+$$;
+
+grant execute on function staff_portal_briefing_for_days(uuid[]) to authenticated;

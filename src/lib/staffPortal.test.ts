@@ -13,9 +13,12 @@ import {
   computeStaffPortalTimelineRows,
   formatClockRange,
   staffPortalArrivalRange,
+  sortStaffPortalCrew,
+  staffPortalSchoolTypeLabel,
   type StaffPortalBlock,
   type StaffPortalTimelineDay,
   type StaffPortalScheduledBlock,
+  type StaffPortalCrewMember,
 } from "./staffPortal";
 
 // Every field a real block carries, defaulted to an inert value, so each
@@ -336,5 +339,47 @@ describe("computeStaffPortalTimelineRows", () => {
     expect(rows.map((r) => r.id)).toEqual(["header", "k1", "brk"]); // k1+k2 merged under k1's id
     expect(rows[1].grade_label).toBe("Kinder A + B");
     expect(rows[1].student_count).toBe(14);
+  });
+});
+
+describe("sortStaffPortalCrew", () => {
+  function member(overrides: Partial<StaffPortalCrewMember>): StaffPortalCrewMember {
+    return { name: "Someone", role: "Assistant", ...overrides };
+  }
+
+  it("orders Supervisor, Photographer, Assistant, then Trainee — not database/insertion order", () => {
+    const crew = [
+      member({ name: "Zoe", role: "Trainee" }),
+      member({ name: "Ana", role: "Assistant" }),
+      member({ name: "Kai", role: "Photographer" }),
+      member({ name: "Bo", role: "Supervisor" }),
+    ];
+    expect(sortStaffPortalCrew(crew).map((m) => m.role)).toEqual(["Supervisor", "Photographer", "Assistant", "Trainee"]);
+  });
+
+  it("sorts alphabetically by name within the same role", () => {
+    const crew = [member({ name: "Zed", role: "Photographer" }), member({ name: "Ada", role: "Photographer" })];
+    expect(sortStaffPortalCrew(crew).map((m) => m.name)).toEqual(["Ada", "Zed"]);
+  });
+
+  it("does not mutate the input array", () => {
+    const crew = [member({ name: "Zed", role: "Trainee" }), member({ name: "Ada", role: "Supervisor" })];
+    const original = [...crew];
+    sortStaffPortalCrew(crew);
+    expect(crew).toEqual(original);
+  });
+});
+
+describe("staffPortalSchoolTypeLabel", () => {
+  it("prefers the finer-grained school_type when it's set", () => {
+    expect(staffPortalSchoolTypeLabel({ category: "K-12", school_type: "TK-8" })).toBe("TK-8");
+  });
+
+  it("falls back to category when school_type is blank", () => {
+    expect(staffPortalSchoolTypeLabel({ category: "Preschool", school_type: "" })).toBe("Preschool");
+  });
+
+  it("falls back to category when school_type is only whitespace", () => {
+    expect(staffPortalSchoolTypeLabel({ category: "K-12", school_type: "   " })).toBe("K-12");
   });
 });
