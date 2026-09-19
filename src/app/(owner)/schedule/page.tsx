@@ -360,7 +360,7 @@ export default async function SchedulePage({
                             className="btn-secondary"
                             style={{ fontSize: 12 }}
                           >
-                            <ExternalLink size={12} /> Timeline
+                            <ExternalLink size={12} /> Details
                           </a>
                         )}
                         <LockJobButton jobId={jd.jobId} locked={lockedJobIds.has(jd.jobId)} jobName={jd.jobName} />
