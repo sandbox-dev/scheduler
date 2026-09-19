@@ -766,23 +766,23 @@ grant execute on function current_staff_id() to authenticated;
 -- write anything at all (not even their own row) — editing stays an
 -- owner-only action from the Staff page.
 drop policy if exists "staff-scoped read own row" on staff;
-create policy "staff-scoped read own row" as restrictive on staff
+create policy "staff-scoped read own row" on staff as restrictive
   for select to authenticated
   using (not is_staff_account() or id = current_staff_id());
 
 drop policy if exists "staff-scoped no insert" on staff;
-create policy "staff-scoped no insert" as restrictive on staff
+create policy "staff-scoped no insert" on staff as restrictive
   for insert to authenticated
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no update" on staff;
-create policy "staff-scoped no update" as restrictive on staff
+create policy "staff-scoped no update" on staff as restrictive
   for update to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no delete" on staff;
-create policy "staff-scoped no delete" as restrictive on staff
+create policy "staff-scoped no delete" on staff as restrictive
   for delete to authenticated
   using (not is_staff_account());
 
@@ -790,23 +790,23 @@ create policy "staff-scoped no delete" as restrictive on staff
 -- assignments (any job/date, so the staff view can show upcoming ones),
 -- never anyone else's, and can never write.
 drop policy if exists "staff-scoped read own assignments" on schedule_assignments;
-create policy "staff-scoped read own assignments" as restrictive on schedule_assignments
+create policy "staff-scoped read own assignments" on schedule_assignments as restrictive
   for select to authenticated
   using (not is_staff_account() or staff_id = current_staff_id());
 
 drop policy if exists "staff-scoped no insert" on schedule_assignments;
-create policy "staff-scoped no insert" as restrictive on schedule_assignments
+create policy "staff-scoped no insert" on schedule_assignments as restrictive
   for insert to authenticated
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no update" on schedule_assignments;
-create policy "staff-scoped no update" as restrictive on schedule_assignments
+create policy "staff-scoped no update" on schedule_assignments as restrictive
   for update to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no delete" on schedule_assignments;
-create policy "staff-scoped no delete" as restrictive on schedule_assignments
+create policy "staff-scoped no delete" on schedule_assignments as restrictive
   for delete to authenticated
   using (not is_staff_account());
 
@@ -814,7 +814,7 @@ create policy "staff-scoped no delete" as restrictive on schedule_assignments
 -- actually assigned to (via schedule_assignments), never any other job's
 -- days, and can never write.
 drop policy if exists "staff-scoped read own picture days" on picture_days;
-create policy "staff-scoped read own picture days" as restrictive on picture_days
+create policy "staff-scoped read own picture days" on picture_days as restrictive
   for select to authenticated
   using (
     not is_staff_account()
@@ -825,25 +825,25 @@ create policy "staff-scoped read own picture days" as restrictive on picture_day
   );
 
 drop policy if exists "staff-scoped no insert" on picture_days;
-create policy "staff-scoped no insert" as restrictive on picture_days
+create policy "staff-scoped no insert" on picture_days as restrictive
   for insert to authenticated
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no update" on picture_days;
-create policy "staff-scoped no update" as restrictive on picture_days
+create policy "staff-scoped no update" on picture_days as restrictive
   for update to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no delete" on picture_days;
-create policy "staff-scoped no delete" as restrictive on picture_days
+create policy "staff-scoped no delete" on picture_days as restrictive
   for delete to authenticated
   using (not is_staff_account());
 
 -- jobs: same idea — only a job a staff-scoped login is actually assigned to
 -- (schedule_assignments already carries job_id directly), read-only.
 drop policy if exists "staff-scoped read own jobs" on jobs;
-create policy "staff-scoped read own jobs" as restrictive on jobs
+create policy "staff-scoped read own jobs" on jobs as restrictive
   for select to authenticated
   using (
     not is_staff_account()
@@ -854,25 +854,25 @@ create policy "staff-scoped read own jobs" as restrictive on jobs
   );
 
 drop policy if exists "staff-scoped no insert" on jobs;
-create policy "staff-scoped no insert" as restrictive on jobs
+create policy "staff-scoped no insert" on jobs as restrictive
   for insert to authenticated
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no update" on jobs;
-create policy "staff-scoped no update" as restrictive on jobs
+create policy "staff-scoped no update" on jobs as restrictive
   for update to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no delete" on jobs;
-create policy "staff-scoped no delete" as restrictive on jobs
+create policy "staff-scoped no delete" on jobs as restrictive
   for delete to authenticated
   using (not is_staff_account());
 
 -- schools: only a school behind a job a staff-scoped login is assigned to
 -- (for the address shown on the staff view), read-only.
 drop policy if exists "staff-scoped read own schools" on schools;
-create policy "staff-scoped read own schools" as restrictive on schools
+create policy "staff-scoped read own schools" on schools as restrictive
   for select to authenticated
   using (
     not is_staff_account()
@@ -884,18 +884,18 @@ create policy "staff-scoped read own schools" as restrictive on schools
   );
 
 drop policy if exists "staff-scoped no insert" on schools;
-create policy "staff-scoped no insert" as restrictive on schools
+create policy "staff-scoped no insert" on schools as restrictive
   for insert to authenticated
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no update" on schools;
-create policy "staff-scoped no update" as restrictive on schools
+create policy "staff-scoped no update" on schools as restrictive
   for update to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no delete" on schools;
-create policy "staff-scoped no delete" as restrictive on schools
+create policy "staff-scoped no delete" on schools as restrictive
   for delete to authenticated
   using (not is_staff_account());
 
@@ -907,49 +907,49 @@ create policy "staff-scoped no delete" as restrictive on schools
 -- below instead, which is narrowly scoped to exactly what the staff view
 -- needs.
 drop policy if exists "staff-scoped no access" on availability;
-create policy "staff-scoped no access" as restrictive on availability
+create policy "staff-scoped no access" on availability as restrictive
   for all to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no access" on availability_links;
-create policy "staff-scoped no access" as restrictive on availability_links
+create policy "staff-scoped no access" on availability_links as restrictive
   for all to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no access" on availability_notes;
-create policy "staff-scoped no access" as restrictive on availability_notes
+create policy "staff-scoped no access" on availability_notes as restrictive
   for all to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no access" on availability_submissions;
-create policy "staff-scoped no access" as restrictive on availability_submissions
+create policy "staff-scoped no access" on availability_submissions as restrictive
   for all to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no access" on availability_send_log;
-create policy "staff-scoped no access" as restrictive on availability_send_log
+create policy "staff-scoped no access" on availability_send_log as restrictive
   for all to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no access" on schedule_approvals;
-create policy "staff-scoped no access" as restrictive on schedule_approvals
+create policy "staff-scoped no access" on schedule_approvals as restrictive
   for all to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no access" on staff_school_distances;
-create policy "staff-scoped no access" as restrictive on staff_school_distances
+create policy "staff-scoped no access" on staff_school_distances as restrictive
   for all to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
 
 drop policy if exists "staff-scoped no access" on equipment_cases;
-create policy "staff-scoped no access" as restrictive on equipment_cases
+create policy "staff-scoped no access" on equipment_cases as restrictive
   for all to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
