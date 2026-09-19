@@ -145,3 +145,30 @@ export async function getSubmittedStaffIdsForMonth(month: string): Promise<Set<s
   if (error) throw error;
   return new Set((data as { staff_id: string }[]).map((r) => r.staff_id));
 }
+
+// This app's own `jobs.id` -> the Timeline Builder job that was imported
+// FROM it, if any — reads timeline-builder's `tb_jobs` table directly (same
+// Supabase project, see schema.sql's header comment; this is the only file
+// in this app that reaches across into Timeline Builder's tables, mirroring
+// how timeline-builder's schedulerImport.ts reaches into this app's own
+// tables). Adi, 2026-09-18: "closing the loop" — from a job on the
+// schedule, jump straight to its timeline. Only ever matches a job actually
+// imported the normal way (Pixifi -> here -> Timeline Builder); no
+// fuzzy school-name/date guessing, same reasoning timeline-builder's own
+// import already uses. Fails closed to an empty map so a hiccup here can
+// never take down the Schedule page itself.
+export async function getTimelineBuilderJobIds(schedulerJobIds: string[]): Promise<Map<string, string>> {
+  if (schedulerJobIds.length === 0) return new Map();
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("tb_jobs")
+      .select("id, scheduler_job_id")
+      .in("scheduler_job_id", schedulerJobIds);
+    if (error) throw error;
+    return new Map((data || []).map((r) => [r.scheduler_job_id as string, r.id as string]));
+  } catch (err) {
+    console.error("getTimelineBuilderJobIds failed — hiding the timeline links", err);
+    return new Map();
+  }
+}
