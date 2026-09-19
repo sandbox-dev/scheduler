@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutList, CalendarRange, ChevronLeft, ChevronRight, Users, Download } from "lucide-react";
+import { LayoutList, CalendarRange, ChevronLeft, ChevronRight, Users, Download, ExternalLink } from "lucide-react";
 import {
   getApprovalForMonth,
   getAvailability,
@@ -8,6 +8,7 @@ import {
   getScheduleAssignments,
   getStaff,
   getStaffSchoolDistances,
+  getTimelineBuilderJobIds,
 } from "@/lib/data";
 import {
   buildDistanceMap,
@@ -70,7 +71,10 @@ export default async function SchedulePage({
   const defaultWeekStart = mondayOf(needed[0]?.date || month);
   const weekStart = sp.week && /^\d{4}-\d{2}-\d{2}$/.test(sp.week) ? sp.week : defaultWeekStart;
 
-  const approval = await getApprovalForMonth(month);
+  const [approval, timelineBuilderJobIds] = await Promise.all([
+    getApprovalForMonth(month),
+    getTimelineBuilderJobIds(jobs.map((j) => j.id)),
+  ]);
 
   const hasSchedule = assignments.length > 0;
   // Same "which jobs does Regenerate actually touch" filter as
@@ -341,7 +345,26 @@ export default async function SchedulePage({
                           {jd.is_babies && <CategoryBadge category="Babies" />}
                         </div>
                       </div>
-                      <LockJobButton jobId={jd.jobId} locked={lockedJobIds.has(jd.jobId)} jobName={jd.jobName} />
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        {/* Only shows for a job actually imported from here into
+                            Timeline Builder — nothing to guess at otherwise (see
+                            getTimelineBuilderJobIds). Requires
+                            NEXT_PUBLIC_TIMELINE_BUILDER_URL to be set — a
+                            separate Vercel deployment, so this is a real
+                            cross-site link, not an in-app route. */}
+                        {timelineBuilderJobIds.get(jd.jobId) && process.env.NEXT_PUBLIC_TIMELINE_BUILDER_URL && (
+                          <a
+                            href={`${process.env.NEXT_PUBLIC_TIMELINE_BUILDER_URL}/jobs/${timelineBuilderJobIds.get(jd.jobId)}/details`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-secondary"
+                            style={{ fontSize: 12 }}
+                          >
+                            <ExternalLink size={12} /> Timeline
+                          </a>
+                        )}
+                        <LockJobButton jobId={jd.jobId} locked={lockedJobIds.has(jd.jobId)} jobName={jd.jobName} />
+                      </div>
                     </div>
 
                     {ROLES.filter((r) => jd.crew[r] > 0).map((role) => {
