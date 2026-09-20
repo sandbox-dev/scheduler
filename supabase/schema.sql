@@ -833,9 +833,31 @@ create policy "staff-scoped no delete" on schedule_assignments as restrictive
   for delete to authenticated
   using (not is_staff_account());
 
--- picture_days: a staff-scoped login can read only a Picture Day they're
--- actually assigned to (via schedule_assignments), never any other job's
--- days, and can never write.
+-- picture_days: widened 2026-09-19 for the "Day N of M" fix on /team. Used
+-- to be "only a Picture Day this staff member is personally assigned to" —
+-- that made a job's real day count invisible to its own crew: someone
+-- covering just one day of a 2-day job couldn't tell it was actually day 2
+-- of 2 (started yesterday), only that they had one day on it. Now: any
+-- Picture Day belonging to a job this staff member is assigned to (via ANY
+-- of that job's schedule_assignments, not necessarily this staff member's
+-- own row) — never any other job's days, and can never write. Same
+-- widening shape as "staff-scoped read own jobs" below, which already lets
+-- a staff-scoped login read the FULL job row for any job they're assigned
+-- to; this just extends that same "the whole job is visible, not just my
+-- own slice of it" reasoning down onto picture_days.
+--
+-- Verified safe to widen: a picture_days row only carries id, job_id, date,
+-- setups, round_trip_miles, is_outdoor, has_group_photo, is_babies,
+-- adjustments — no staff names and no other person's schedule info, nothing
+-- beyond "this job has another day, on this date, with these shoot
+-- characteristics." A staff member assigned to the job can already read
+-- the job's own full row (see "staff-scoped read own jobs" below) and
+-- already knows colleagues could be covering other days of it, so this
+-- widening adds no new exposure of WHO is on those other days — that still
+-- requires being assigned to that specific day, gated separately by the
+-- untouched schedule_assignments policy above and by
+-- staff_portal_crew_for_days() further down, both of which still check the
+-- caller's own staff id, not just "assigned to this job."
 drop policy if exists "staff-scoped read own picture days" on picture_days;
 create policy "staff-scoped read own picture days" on picture_days as restrictive
   for select to authenticated
@@ -843,7 +865,7 @@ create policy "staff-scoped read own picture days" on picture_days as restrictiv
     not is_staff_account()
     or exists (
       select 1 from schedule_assignments sa
-      where sa.picture_day_id = picture_days.id and sa.staff_id = current_staff_id()
+      where sa.job_id = picture_days.job_id and sa.staff_id = current_staff_id()
     )
   );
 

@@ -16,7 +16,7 @@ import type {
   StaffPortalTimelineDay,
   StaffPortalTimelineFields,
 } from "@/lib/staffPortal";
-import { sortStaffPortalCrew } from "@/lib/staffPortal";
+import { computeJobDayPosition, sortStaffPortalCrew } from "@/lib/staffPortal";
 
 export async function getSchools(): Promise<School[]> {
   const supabase = await createClient();
@@ -223,18 +223,15 @@ export type StaffPortalAssignment = {
     reference_photos_url: string | null;
     setup_photos_url: string | null;
   } | null;
-  // "Day N of M" for a multi-day job — counted from only the Picture Days
-  // of this job THIS staff member is personally assigned to (all of them,
-  // not just whatever date window the page is currently showing), ordered
-  // by date. Deliberately scoped this way rather than the job's real total
-  // Picture Day count: the "staff-scoped read own picture days" RLS policy
-  // (supabase/schema.sql) only ever lets a staff-scoped login read a
-  // picture_days row it's actually assigned to, so a day of the same job
-  // this staff member does NOT work is invisible to it by design — "M" here
-  // means "how many days of this job I'm on," not "how many days the job
-  // has." job_total_days is 1 for a single-day job (or a day this staff
-  // works alone on an otherwise multi-day job); the UI only shows the badge
-  // when it's > 1.
+  // "Day N of M" for a multi-day job — the job's REAL day count and this
+  // day's real position in it (fixed 2026-09-19; see computeJobDayPosition()
+  // in src/lib/staffPortal.ts for why this used to only reflect "how many
+  // days of this job I'm personally on"). Computed from every Picture Day
+  // the job has, not just the ones this staff member is assigned to — made
+  // possible by the widened "staff-scoped read own picture days" RLS policy
+  // in supabase/schema.sql, which now lets a staff-scoped login read any day
+  // of a job it's assigned to, not only its own day(s). job_total_days is 1
+  // for a genuinely single-day job; the UI only shows the badge when it's > 1.
   job_day_number: number;
   job_total_days: number;
 };
@@ -257,11 +254,16 @@ export async function getMyAssignments(
   if (assignmentsError) throw assignmentsError;
   if (!assignments || assignments.length === 0) return [];
 
-  const pictureDayIds = [...new Set(assignments.map((a) => a.picture_day_id))];
   const jobIds = [...new Set(assignments.map((a) => a.job_id))];
 
-  const [{ data: pictureDays, error: pdError }, { data: jobs, error: jobsError }] = await Promise.all([
-    supabase.from("picture_days").select("id, date, setups, is_outdoor").in("id", pictureDayIds),
+  // Selected by job_id (every Picture Day on each job), not by this staff
+  // member's own picture_day_ids — this is what makes the job's REAL day
+  // count/position computable below, now that the widened staff-scoped RLS
+  // policy on picture_days (supabase/schema.sql) lets this login read every
+  // day of a job it's assigned to. Still a strict superset of this staff
+  // member's own assigned days, so it doubles as the lookup for those too.
+  const [{ data: allJobPictureDays, error: pdError }, { data: jobs, error: jobsError }] = await Promise.all([
+    supabase.from("picture_days").select("id, date, setups, is_outdoor, job_id").in("job_id", jobIds),
     supabase.from("jobs").select("id, name, school_id, category, school_type").in("id", jobIds),
   ]);
   if (pdError) throw pdError;
@@ -286,25 +288,23 @@ export async function getMyAssignments(
       };
   if (schoolsError) throw schoolsError;
 
-  const pictureDayById = new Map((pictureDays || []).map((pd) => [pd.id as string, pd]));
+  const pictureDayById = new Map((allJobPictureDays || []).map((pd) => [pd.id as string, pd]));
   const jobById = new Map((jobs || []).map((j) => [j.id as string, j]));
   const schoolById = new Map((schools || []).map((s) => [s.id as string, s]));
 
-  // This staff member's own assigned dates for each job, ALL of them (not
-  // just the ones inside [fromDate, toDate]) — every assignment row was
-  // already fetched above with no date filter, so this reflects the whole
-  // job as far as this staff member's own access goes. See job_day_number/
-  // job_total_days' own comment on StaffPortalAssignment for why this is
-  // scoped to "days I'm on," not the job's real total day count.
+  // EVERY date the job actually has, per job — not just this staff member's
+  // own assigned dates — now that allJobPictureDays (above) is fetched by
+  // job_id rather than by this staff member's own picture_day_ids. This is
+  // what makes job_day_number/job_total_days below the job's real day
+  // count/position rather than "how many days of this job I'm on." See
+  // computeJobDayPosition() in src/lib/staffPortal.ts for the actual ranking
+  // (and its own dedup-duplicate-dates handling).
   const datesByJob = new Map<string, string[]>();
-  for (const a of assignments) {
-    const pictureDay = pictureDayById.get(a.picture_day_id);
-    if (!pictureDay) continue;
-    const dates = datesByJob.get(a.job_id) ?? [];
-    if (!dates.includes(pictureDay.date)) dates.push(pictureDay.date);
-    datesByJob.set(a.job_id, dates);
+  for (const pd of allJobPictureDays || []) {
+    const dates = datesByJob.get(pd.job_id) ?? [];
+    dates.push(pd.date);
+    datesByJob.set(pd.job_id, dates);
   }
-  for (const dates of datesByJob.values()) dates.sort();
 
   return assignments
     .map((a): StaffPortalAssignment | null => {
@@ -313,7 +313,7 @@ export async function getMyAssignments(
       if (!pictureDay || !job) return null;
       if (pictureDay.date < fromDate || pictureDay.date > toDate) return null;
       const school = job.school_id ? schoolById.get(job.school_id) ?? null : null;
-      const jobDates = datesByJob.get(a.job_id) ?? [pictureDay.date];
+      const { dayNumber, dayCount } = computeJobDayPosition(pictureDay.date, datesByJob.get(a.job_id) ?? [pictureDay.date]);
       return {
         id: a.id,
         role: a.role as Role,
@@ -334,8 +334,8 @@ export async function getMyAssignments(
               setup_photos_url: school.setup_photos_url,
             }
           : null,
-        job_day_number: jobDates.indexOf(pictureDay.date) + 1,
-        job_total_days: jobDates.length,
+        job_day_number: dayNumber,
+        job_total_days: dayCount,
       };
     })
     .filter((a): a is StaffPortalAssignment => a !== null)
