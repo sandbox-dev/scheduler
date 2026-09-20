@@ -1289,6 +1289,17 @@ grant execute on function staff_portal_crew_for_days(uuid[]) to authenticated;
 -- that key was never added for that school/season (never falling back to
 -- the job's own flat list in that case) — same as timeline-builder's own
 -- `school?.pixifi_custom_fields[fieldType] ?? []`.
+--
+-- Adding location_notes/reference_photos_url/setup_photos_url as trailing
+-- columns here required dropping the function first — Postgres allows
+-- CREATE OR REPLACE to widen a table function's columns in some cases, but
+-- not always, and it refuses outright rather than guessing (a real error
+-- Adi hit running this the first time: "cannot change return type of
+-- existing function"). Drop-then-recreate in one script is safe: nothing
+-- else in the database references this function directly (it's called
+-- only from application code via RPC), and this whole block runs as one
+-- transaction, so there's never a moment where the function doesn't exist.
+drop function if exists staff_portal_briefing_for_days(uuid[]);
 create or replace function staff_portal_briefing_for_days(p_picture_day_ids uuid[])
 returns table(
   picture_day_id uuid,
