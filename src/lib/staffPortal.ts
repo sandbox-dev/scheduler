@@ -346,6 +346,7 @@ export type StaffPortalBriefingFields = {
   individual_photo_location: string | null;
   dress_code_note: string | null;
   additional_gear_notes: string | null;
+  parking_notes: string | null;
   custom_fields: StaffPortalCustomField[];
 };
 

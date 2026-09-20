@@ -223,6 +223,20 @@ export type StaffPortalAssignment = {
     reference_photos_url: string | null;
     setup_photos_url: string | null;
   } | null;
+  // "Day N of M" for a multi-day job — counted from only the Picture Days
+  // of this job THIS staff member is personally assigned to (all of them,
+  // not just whatever date window the page is currently showing), ordered
+  // by date. Deliberately scoped this way rather than the job's real total
+  // Picture Day count: the "staff-scoped read own picture days" RLS policy
+  // (supabase/schema.sql) only ever lets a staff-scoped login read a
+  // picture_days row it's actually assigned to, so a day of the same job
+  // this staff member does NOT work is invisible to it by design — "M" here
+  // means "how many days of this job I'm on," not "how many days the job
+  // has." job_total_days is 1 for a single-day job (or a day this staff
+  // works alone on an otherwise multi-day job); the UI only shows the badge
+  // when it's > 1.
+  job_day_number: number;
+  job_total_days: number;
 };
 
 // Every Picture Day this staff member is assigned to, from fromDate through
@@ -276,6 +290,22 @@ export async function getMyAssignments(
   const jobById = new Map((jobs || []).map((j) => [j.id as string, j]));
   const schoolById = new Map((schools || []).map((s) => [s.id as string, s]));
 
+  // This staff member's own assigned dates for each job, ALL of them (not
+  // just the ones inside [fromDate, toDate]) — every assignment row was
+  // already fetched above with no date filter, so this reflects the whole
+  // job as far as this staff member's own access goes. See job_day_number/
+  // job_total_days' own comment on StaffPortalAssignment for why this is
+  // scoped to "days I'm on," not the job's real total day count.
+  const datesByJob = new Map<string, string[]>();
+  for (const a of assignments) {
+    const pictureDay = pictureDayById.get(a.picture_day_id);
+    if (!pictureDay) continue;
+    const dates = datesByJob.get(a.job_id) ?? [];
+    if (!dates.includes(pictureDay.date)) dates.push(pictureDay.date);
+    datesByJob.set(a.job_id, dates);
+  }
+  for (const dates of datesByJob.values()) dates.sort();
+
   return assignments
     .map((a): StaffPortalAssignment | null => {
       const pictureDay = pictureDayById.get(a.picture_day_id);
@@ -283,6 +313,7 @@ export async function getMyAssignments(
       if (!pictureDay || !job) return null;
       if (pictureDay.date < fromDate || pictureDay.date > toDate) return null;
       const school = job.school_id ? schoolById.get(job.school_id) ?? null : null;
+      const jobDates = datesByJob.get(a.job_id) ?? [pictureDay.date];
       return {
         id: a.id,
         role: a.role as Role,
@@ -303,6 +334,8 @@ export async function getMyAssignments(
               setup_photos_url: school.setup_photos_url,
             }
           : null,
+        job_day_number: jobDates.indexOf(pictureDay.date) + 1,
+        job_total_days: jobDates.length,
       };
     })
     .filter((a): a is StaffPortalAssignment => a !== null)
@@ -442,6 +475,7 @@ export async function getStaffPortalBriefing(
           individual_photo_location: string | null;
           dress_code_note: string | null;
           additional_gear_notes: string | null;
+          parking_notes: string | null;
           custom_fields: { id: string; label: string; value: string }[] | null;
         }[]
       ).map((r) => [
@@ -454,6 +488,7 @@ export async function getStaffPortalBriefing(
           individual_photo_location: r.individual_photo_location,
           dress_code_note: r.dress_code_note,
           additional_gear_notes: r.additional_gear_notes,
+          parking_notes: r.parking_notes,
           custom_fields: r.custom_fields ?? [],
         },
       ])

@@ -1222,6 +1222,14 @@ grant execute on function staff_portal_crew_for_days(uuid[]) to authenticated;
 -- location, dress_code_note, and additional_gear_notes are three more
 -- plain tb_jobs columns, added the same way as backdrop/wifi above.
 --
+-- Extended again 2026-09-19: parking_notes is a fourth such tb_jobs column
+-- (onsite/street parking, reserved spots, etc. — added there for the same
+-- Pixifi Event Info panel work, see timeline-builder's own schema.sql). This
+-- is distinct from this app's own schools.staff_notes (navigation/address
+-- confusion — "GPS says X but the real entrance is Y" — see that column's
+-- own comment further up this file); both are real, separate staff-only
+-- facts and both are shown on /team, just from different tables.
+--
 -- custom_fields is the interesting one — Adi's free-form "extra facts"
 -- list. It is NOT simply tb_jobs.pixifi_custom_fields: timeline-builder
 -- replaced that flat per-job list with tb_schools.pixifi_custom_fields,
@@ -1258,6 +1266,7 @@ returns table(
   individual_photo_location text,
   dress_code_note text,
   additional_gear_notes text,
+  parking_notes text,
   custom_fields jsonb
 )
 language plpgsql
@@ -1283,6 +1292,7 @@ begin
       tj.individual_photo_location,
       tj.dress_code_note,
       tj.additional_gear_notes,
+      tj.parking_notes,
       tj.school_id,
       tj.pixifi_custom_fields as job_custom_fields,
       ts.pixifi_custom_fields as school_custom_fields,
@@ -1311,6 +1321,7 @@ begin
     nullif(b.individual_photo_location, ''),
     nullif(b.dress_code_note, ''),
     nullif(b.additional_gear_notes, ''),
+    nullif(b.parking_notes, ''),
     case
       when b.school_id is not null and b.field_type is not null
         then coalesce(b.school_custom_fields -> b.field_type, '[]'::jsonb)
