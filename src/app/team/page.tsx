@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, NotebookPen } from "lucide-react";
 import { Card, RoleTag } from "@/components/ui";
 import {
   getMyAssignments,
@@ -33,8 +33,10 @@ import { logout } from "./login/actions";
 // gets its own lightly-boxed sub-section instead of just flowing together
 // with a small text label between them ("it's a lot of info in one box, all
 // smushed together... the headers get lost"). Deliberately NOT applied to
-// the card's own identity header or to Location Notes/the photo links —
-// those are "small enough to sit together," not their own big box.
+// the card's own identity header or to Location Notes — that's "small
+// enough to sit on its own," not its own big box. (The Setup/Reference
+// Photos links used to sit here too, unboxed, but moved inside the Details
+// box 2026-09-19 — see DayBriefingSection below.)
 const sectionBoxStyle = {
   background: "#FAF8F5",
   border: "1px solid var(--line)",
@@ -176,6 +178,39 @@ function DayBriefingSection({
         {briefing && visibleStaffPortalCustomFields(briefing.custom_fields).map((f) => (
           <BriefingFact key={f.id} label={f.label} value={f.value} />
         ))}
+
+        {/* Per-SCHOOL Google Drive links (every job at this school shares
+            the same two folders) — lives on tb_schools now, owner-set from
+            Timeline Builder's School Details page. Placed at the end of
+            this same Details box (moved here from unboxed-near-the-top
+            2026-09-19) since these are just two more staff-facing school
+            facts, not their own concept. */}
+        {(briefing?.setup_photos_url || briefing?.reference_photos_url) && (
+          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+            {briefing?.setup_photos_url && (
+              <a
+                href={briefing.setup_photos_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary"
+                style={{ flex: 1, justifyContent: "center", background: "var(--navy)", color: "#fff", border: "none" }}
+              >
+                <Images size={13} /> Setup Photos <ExternalLink size={12} />
+              </a>
+            )}
+            {briefing?.reference_photos_url && (
+              <a
+                href={briefing.reference_photos_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary"
+                style={{ flex: 1, justifyContent: "center", background: "var(--navy)", color: "#fff", border: "none" }}
+              >
+                <Images size={13} /> Reference Photos <ExternalLink size={12} />
+              </a>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
@@ -480,40 +515,6 @@ export default async function TeamPage({
                         not a special one-off style. */}
                     {briefing?.location_notes && <BriefingFact label="Location Notes" value={briefing.location_notes} />}
 
-                    {/* Per-SCHOOL Google Drive links (every job at this school
-                        shares the same two folders) — also moved to
-                        tb_schools 2026-09-19, owner-set from Timeline
-                        Builder's School Details page now instead of this
-                        app's own Saved Schools panel. Rendered together,
-                        right after Location Notes, since both are staff-only
-                        school facts. */}
-                    {(briefing?.setup_photos_url || briefing?.reference_photos_url) && (
-                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        {briefing?.setup_photos_url && (
-                          <a
-                            href={briefing.setup_photos_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn-secondary"
-                            style={{ flex: 1, justifyContent: "center", background: "var(--navy)", color: "#fff", border: "none" }}
-                          >
-                            <Images size={13} /> Setup Photos <ExternalLink size={12} />
-                          </a>
-                        )}
-                        {briefing?.reference_photos_url && (
-                          <a
-                            href={briefing.reference_photos_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn-secondary"
-                            style={{ flex: 1, justifyContent: "center", background: "var(--navy)", color: "#fff", border: "none" }}
-                          >
-                            <Images size={13} /> Reference Photos <ExternalLink size={12} />
-                          </a>
-                        )}
-                      </div>
-                    )}
-
                     <div style={{ ...sectionBoxStyle, marginTop: 14 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                         <Clock size={12} /> Schedule
@@ -534,6 +535,26 @@ export default async function TeamPage({
                     />
 
                     <FullTimelineSection timelineFields={fields} fullDay={fullTimelines.get(a.picture_day.id) ?? null} />
+
+                    {/* Deliberately NOT inside any of the four sectionBoxStyle
+                        boxes above (Schedule/Team/Details/Timeline) — those
+                        are all the before-the-job plan. This is the
+                        after-the-job feedback form, a genuinely separate
+                        concept from Details/Event Info, so it gets its own
+                        distinct styling (.btn-rose, same "reads as its own
+                        distinct action" treatment as the Check Pixifi button
+                        on the owner side) instead of blending in as one more
+                        Details fact. Placed last, after Timeline, since a
+                        staff member fills this out once their day is done. */}
+                    <a
+                      href="https://docs.google.com/forms/d/e/1FAIpQLSemK3O5lFUIuGHxl9gZfkhVLIi2AN7yfmq3w1rj_Lc_W4xyog/viewform"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-rose"
+                      style={{ marginTop: 14, width: "100%", justifyContent: "center" }}
+                    >
+                      <NotebookPen size={13} /> Fill Out Shoot Notes <ExternalLink size={12} />
+                    </a>
                   </div>
                 </details>
               </Card>
