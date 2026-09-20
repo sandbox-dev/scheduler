@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, StickyNote } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, StickyNote } from "lucide-react";
 import { Card, RoleTag } from "@/components/ui";
 import {
   getMyAssignments,
@@ -11,6 +12,7 @@ import {
   type StaffPortalAssignment,
 } from "@/lib/data";
 import { addDays, todayStr } from "@/lib/month";
+import { fmtDate } from "@/lib/scheduling";
 import {
   computeStaffPortalDayTimes,
   computeStaffPortalTimelineRows,
@@ -38,10 +40,10 @@ function formatDayLabel(dateStr: string, todayIso: string) {
 function TimeStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
         {label}
       </div>
-      <div style={{ fontSize: 14.5, fontWeight: 700, marginTop: 2, color: value === "TBD" ? "var(--muted)" : "var(--ink)" }}>
+      <div style={{ fontSize: 16, fontWeight: 700, marginTop: 2, color: value === "TBD" ? "var(--muted)" : "var(--ink)" }}>
         {value}
       </div>
     </div>
@@ -56,10 +58,10 @@ function TimeStat({ label, value }: { label: string; value: string }) {
 function BriefingFact({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
         {label}
       </div>
-      <div style={{ fontSize: 12.5, color: "var(--ink)", marginTop: 1 }}>{value}</div>
+      <div style={{ fontSize: 16, color: "var(--ink)", marginTop: 1 }}>{value}</div>
     </div>
   );
 }
@@ -76,11 +78,13 @@ function DayBriefingSection({
   pictureDay,
   briefing,
   crew,
+  hasReferencePhotos,
 }: {
   job: StaffPortalAssignment["job"];
   pictureDay: StaffPortalAssignment["picture_day"];
   briefing: StaffPortalBriefingFields | null;
   crew: StaffPortalCrewMember[];
+  hasReferencePhotos: boolean;
 }) {
   return (
     <div style={{ marginTop: 14 }}>
@@ -90,7 +94,7 @@ function DayBriefingSection({
           alignItems: "center",
           gap: 6,
           marginBottom: 6,
-          fontSize: 11,
+          fontSize: 13,
           fontWeight: 700,
           color: "var(--muted)",
           textTransform: "uppercase",
@@ -110,6 +114,16 @@ function DayBriefingSection({
         <BriefingFact label="Individual Photo Location" value={briefing.individual_photo_location} />
       )}
       {briefing?.backdrop && <BriefingFact label="Backdrop" value={briefing.backdrop} />}
+      {briefing?.parking_notes && (
+        <>
+          <BriefingFact label="Parking Notes" value={briefing.parking_notes} />
+          {hasReferencePhotos && (
+            <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic", marginTop: 2 }}>
+              See Reference Photos folder for any parking maps or photos
+            </div>
+          )}
+        </>
+      )}
       {briefing?.dress_code_note && <BriefingFact label="Dress Code" value={briefing.dress_code_note} />}
       {briefing?.additional_gear_notes && <BriefingFact label="Additional Gear" value={briefing.additional_gear_notes} />}
       {briefing?.notes && <BriefingFact label="Notes" value={briefing.notes} />}
@@ -127,7 +141,7 @@ function DayBriefingSection({
         <div style={{ marginTop: 8 }}>
           <div
             style={{
-              fontSize: 10,
+              fontSize: 13,
               fontWeight: 700,
               color: "var(--navy)",
               textTransform: "uppercase",
@@ -139,7 +153,7 @@ function DayBriefingSection({
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {crew.map((member, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16 }}>
                 <RoleTag role={member.role} />
                 <span>{member.name}</span>
               </div>
@@ -166,7 +180,7 @@ function TimelineBlockRow({ block }: { block: StaffPortalScheduledBlock }) {
         style={{
           marginTop: 6,
           padding: "6px 8px",
-          fontSize: 11,
+          fontSize: 13,
           fontWeight: 700,
           color: "var(--navy)",
           textTransform: "uppercase",
@@ -185,12 +199,12 @@ function TimelineBlockRow({ block }: { block: StaffPortalScheduledBlock }) {
     const fallback = block.block_type === "break" ? "Break" : block.block_type === "staff" ? "Staff Photos" : "Transition";
     return (
       <div style={{ padding: "7px 8px", background: "var(--rose-tint)", borderRadius: 6, marginTop: 2 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, fontWeight: 700 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 16, fontWeight: 700 }}>
           <span>{time}</span>
           <span>{block.section_label || fallback}</span>
         </div>
         {block.note_text && (
-          <div style={{ fontSize: 11, fontStyle: "italic", color: "var(--muted)", marginTop: 2 }}>{block.note_text}</div>
+          <div style={{ fontSize: 13, fontStyle: "italic", color: "var(--muted)", marginTop: 2 }}>{block.note_text}</div>
         )}
       </div>
     );
@@ -198,20 +212,20 @@ function TimelineBlockRow({ block }: { block: StaffPortalScheduledBlock }) {
 
   if (block.block_type === "note") {
     return (
-      <div style={{ fontSize: 11.5, fontStyle: "italic", color: "var(--muted)", padding: "4px 8px" }}>{block.note_text}</div>
+      <div style={{ fontSize: 13, fontStyle: "italic", color: "var(--muted)", padding: "4px 8px" }}>{block.note_text}</div>
     );
   }
 
   if (block.block_type === "addin") {
     return (
       <div style={{ padding: "6px 8px", borderBottom: "1px solid var(--line)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, fontWeight: 700 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 16, fontWeight: 700 }}>
           <span>{time}</span>
           <span>
             {block.section_label || "Add-Ins"} ({block.student_count})
           </span>
         </div>
-        {block.note_text && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{block.note_text}</div>}
+        {block.note_text && <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{block.note_text}</div>}
       </div>
     );
   }
@@ -232,15 +246,15 @@ function TimelineBlockRow({ block }: { block: StaffPortalScheduledBlock }) {
         borderRadius: block.lane === "group" ? 6 : 0,
       }}
     >
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", minWidth: 84, flexShrink: 0 }}>{time}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: "var(--muted)", minWidth: 96, flexShrink: 0 }}>{time}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>
+        <div style={{ fontSize: 16, fontWeight: 700 }}>
           {block.grade_label}
           {block.age_band ? ` (${block.age_band})` : ""}
         </div>
-        <div style={{ fontSize: 11, color: "var(--muted)" }}>{detailParts.join(" · ")}</div>
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>{detailParts.join(" · ")}</div>
         {block.note_text && (
-          <div style={{ fontSize: 11, fontStyle: "italic", color: "var(--muted)", marginTop: 2 }}>{block.note_text}</div>
+          <div style={{ fontSize: 13, fontStyle: "italic", color: "var(--muted)", marginTop: 2 }}>{block.note_text}</div>
         )}
       </div>
     </div>
@@ -267,7 +281,7 @@ function FullTimelineSection({
           display: "flex",
           alignItems: "center",
           gap: 6,
-          fontSize: 11.5,
+          fontSize: 15,
           fontWeight: 700,
           color: "var(--navy)",
         }}
@@ -276,7 +290,7 @@ function FullTimelineSection({
       </summary>
       <div style={{ marginTop: 8 }}>
         {!fullDay || !timelineFields ? (
-          <div style={{ fontSize: 12, color: "var(--muted)" }}>Timeline not sent yet.</div>
+          <div style={{ fontSize: 15, color: "var(--muted)" }}>Timeline not sent yet.</div>
         ) : (
           <>
             {(() => {
@@ -285,7 +299,7 @@ function FullTimelineSection({
                 <div
                   style={{
                     textAlign: "center",
-                    fontSize: 12,
+                    fontSize: 16,
                     fontWeight: 700,
                     background: "var(--rose-tint)",
                     borderRadius: 6,
@@ -307,7 +321,11 @@ function FullTimelineSection({
   );
 }
 
-export default async function TeamPage() {
+export default async function TeamPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ start?: string }>;
+}) {
   const account = await getMyStaffAccount();
 
   // Shouldn't normally happen — the proxy only ever routes a linked
@@ -317,7 +335,7 @@ export default async function TeamPage() {
     return (
       <div style={{ minHeight: "100dvh", padding: 24, maxWidth: 420, margin: "0 auto" }}>
         <Card>
-          <div style={{ fontSize: 13.5, color: "var(--muted)" }}>
+          <div style={{ fontSize: 16, color: "var(--muted)" }}>
             This login isn&apos;t connected to a staff profile yet. Ask the studio to link your account.
           </div>
           <form action={logout} style={{ marginTop: 16 }}>
@@ -330,9 +348,17 @@ export default async function TeamPage() {
     );
   }
 
+  const sp = await searchParams;
   const today = todayStr();
-  const weekEnd = addDays(today, 6);
-  const assignments = await getMyAssignments(account.id, today, weekEnd);
+  // Rolling 7-day window anchored on ?start= (a plain date, not a
+  // Monday-aligned calendar week — matches how this view always worked
+  // before nav existed: "today through the next 7 days"). Same query-param
+  // navigation convention as the owner-side Schedule page's own Week view
+  // (schedule/page.tsx's `week`/shiftWeek), just a straight ±7-day shift
+  // here since there's no calendar-week alignment to preserve.
+  const weekStart = sp.start && /^\d{4}-\d{2}-\d{2}$/.test(sp.start) ? sp.start : today;
+  const weekEnd = addDays(weekStart, 6);
+  const assignments = await getMyAssignments(account.id, weekStart, weekEnd);
   const pictureDayIds = assignments.map((a) => a.picture_day.id);
   const [timelineTimes, fullTimelines, briefings, crews] = await Promise.all([
     getStaffPortalTimelineTimes(pictureDayIds),
@@ -348,7 +374,7 @@ export default async function TeamPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Image src="/logo.png" alt="Sandbox Photographers" width={64} height={26} style={{ objectFit: "contain" }} priority />
-            <div className="display" style={{ fontSize: 15, fontWeight: 700 }}>Hi, {firstName}</div>
+            <div className="display" style={{ fontSize: 18, fontWeight: 700 }}>Hi, {firstName}</div>
           </div>
           <form action={logout}>
             <button className="btn-secondary" type="submit">
@@ -359,9 +385,23 @@ export default async function TeamPage() {
       </div>
 
       <div style={{ padding: 16, maxWidth: 460, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+          <Link href={`/team?start=${addDays(weekStart, -7)}`} className="btn-secondary" style={{ padding: "7px 10px" }}>
+            <ChevronLeft size={14} />
+          </Link>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>
+            {fmtDate(weekStart).md} – {fmtDate(weekEnd).md}
+          </div>
+          <Link href={`/team?start=${addDays(weekStart, 7)}`} className="btn-secondary" style={{ padding: "7px 10px" }}>
+            <ChevronRight size={14} />
+          </Link>
+        </div>
+
         {assignments.length === 0 ? (
           <Card>
-            <div style={{ fontSize: 13.5, color: "var(--muted)" }}>No Picture Days on the schedule for you this week.</div>
+            <div style={{ fontSize: 16, color: "var(--muted)" }}>
+              No Picture Days scheduled for {fmtDate(weekStart).md} – {fmtDate(weekEnd).md}.
+            </div>
           </Card>
         ) : (
           assignments.map((a) => {
@@ -371,10 +411,11 @@ export default async function TeamPage() {
               <Card key={a.id}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                   <div>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                       {formatDayLabel(a.picture_day.date, today)}
+                      {a.job_total_days > 1 ? ` · Day ${a.job_day_number} of ${a.job_total_days}` : ""}
                     </div>
-                    <div className="display" style={{ fontSize: 16.5, fontWeight: 700, marginTop: 2 }}>
+                    <div className="display" style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>
                       {a.school?.name ?? a.job.name}
                     </div>
                   </div>
@@ -382,7 +423,7 @@ export default async function TeamPage() {
                 </div>
 
                 {a.school?.address && (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 10, fontSize: 12.5, color: "var(--muted)" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 10, fontSize: 16, color: "var(--muted)" }}>
                     <MapPin size={13} style={{ marginTop: 1, flexShrink: 0 }} />
                     {a.school.address}
                   </div>
@@ -408,7 +449,7 @@ export default async function TeamPage() {
                     <div>
                       <div
                         style={{
-                          fontSize: 10,
+                          fontSize: 13,
                           fontWeight: 700,
                           color: "var(--navy)",
                           textTransform: "uppercase",
@@ -418,7 +459,7 @@ export default async function TeamPage() {
                       >
                         Location Notes
                       </div>
-                      <div style={{ fontSize: 12.5, color: "var(--ink)" }}>{a.school.staff_notes}</div>
+                      <div style={{ fontSize: 16, color: "var(--ink)" }}>{a.school.staff_notes}</div>
                     </div>
                   </div>
                 )}
@@ -454,7 +495,7 @@ export default async function TeamPage() {
                   </div>
                 )}
 
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, marginBottom: 6, fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, marginBottom: 6, fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   <Clock size={12} /> Schedule
                 </div>
                 <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
@@ -468,6 +509,7 @@ export default async function TeamPage() {
                   pictureDay={a.picture_day}
                   briefing={briefings.get(a.picture_day.id) ?? null}
                   crew={crews.get(a.picture_day.id) ?? []}
+                  hasReferencePhotos={!!a.school?.reference_photos_url}
                 />
 
                 <FullTimelineSection timelineFields={fields} fullDay={fullTimelines.get(a.picture_day.id) ?? null} />
