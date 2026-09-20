@@ -28,6 +28,20 @@ import {
 } from "@/lib/staffPortal";
 import { logout } from "./login/actions";
 
+// Adi-approved (in a separate mockup, never built until now): each major
+// section on an expanded day card — Schedule, Team, Details, Full Timeline —
+// gets its own lightly-boxed sub-section instead of just flowing together
+// with a small text label between them ("it's a lot of info in one box, all
+// smushed together... the headers get lost"). Deliberately NOT applied to
+// the card's own identity header or to Location Notes/the photo links —
+// those are "small enough to sit together," not their own big box.
+const sectionBoxStyle = {
+  background: "#FAF8F5",
+  border: "1px solid var(--line)",
+  borderRadius: 14,
+  padding: 16,
+};
+
 // "Today, Fri, Sep 19" for today, plain "Sat, Sep 20" for everything else —
 // the whole point of the badge is making today's card impossible to miss
 // on a small phone screen at a glance.
@@ -87,58 +101,9 @@ function DayBriefingSection({
   hasReferencePhotos: boolean;
 }) {
   return (
-    <div style={{ marginTop: 14 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          marginBottom: 6,
-          fontSize: 13,
-          fontWeight: 700,
-          color: "var(--muted)",
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-        }}
-      >
-        <ClipboardList size={12} /> Details
-      </div>
-
-      <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
-        <TimeStat label="School Type" value={staffPortalSchoolTypeLabel(job)} />
-        <TimeStat label="Setups" value={String(pictureDay.setups)} />
-        <TimeStat label="Location" value={pictureDay.is_outdoor ? "Outdoor" : "Indoor"} />
-      </div>
-
-      {briefing?.individual_photo_location && (
-        <BriefingFact label="Individual Photo Location" value={briefing.individual_photo_location} />
-      )}
-      {briefing?.backdrop && <BriefingFact label="Backdrop" value={briefing.backdrop} />}
-      {briefing?.parking_notes && (
-        <>
-          <BriefingFact label="Parking Notes" value={briefing.parking_notes} />
-          {hasReferencePhotos && (
-            <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic", marginTop: 2 }}>
-              See Reference Photos folder for any parking maps or photos
-            </div>
-          )}
-        </>
-      )}
-      {briefing?.dress_code_note && <BriefingFact label="Dress Code" value={briefing.dress_code_note} />}
-      {briefing?.additional_gear_notes && <BriefingFact label="Additional Gear" value={briefing.additional_gear_notes} />}
-      {briefing?.notes && <BriefingFact label="Notes" value={briefing.notes} />}
-      {briefing?.wifi_network && (
-        <BriefingFact
-          label="Wifi"
-          value={briefing.wifi_password ? `${briefing.wifi_network} — ${briefing.wifi_password}` : briefing.wifi_network}
-        />
-      )}
-      {briefing && visibleStaffPortalCustomFields(briefing.custom_fields).map((f) => (
-        <BriefingFact key={f.id} label={f.label} value={f.value} />
-      ))}
-
+    <>
       {crew.length > 0 && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ ...sectionBoxStyle, marginTop: 14 }}>
           <div
             style={{
               fontSize: 13,
@@ -146,7 +111,7 @@ function DayBriefingSection({
               color: "var(--navy)",
               textTransform: "uppercase",
               letterSpacing: "0.04em",
-              marginBottom: 4,
+              marginBottom: 12,
             }}
           >
             Team
@@ -161,7 +126,58 @@ function DayBriefingSection({
           </div>
         </div>
       )}
-    </div>
+
+      <div style={{ ...sectionBoxStyle, marginTop: 14 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: 12,
+            fontSize: 13,
+            fontWeight: 700,
+            color: "var(--muted)",
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+          }}
+        >
+          <ClipboardList size={12} /> Details
+        </div>
+
+        <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+          <TimeStat label="School Type" value={staffPortalSchoolTypeLabel(job)} />
+          <TimeStat label="Setups" value={String(pictureDay.setups)} />
+          <TimeStat label="Location" value={pictureDay.is_outdoor ? "Outdoor" : "Indoor"} />
+        </div>
+
+        {briefing?.individual_photo_location && (
+          <BriefingFact label="Individual Photo Location" value={briefing.individual_photo_location} />
+        )}
+        {briefing?.backdrop && <BriefingFact label="Backdrop" value={briefing.backdrop} />}
+        {briefing?.parking_notes && (
+          <>
+            <BriefingFact label="Parking Notes" value={briefing.parking_notes} />
+            {hasReferencePhotos && (
+              <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic", marginTop: 2 }}>
+                See Reference Photos folder for any parking maps or photos
+              </div>
+            )}
+          </>
+        )}
+        {briefing?.dress_code_note && <BriefingFact label="Dress Code" value={briefing.dress_code_note} />}
+        {briefing?.additional_gear_notes && <BriefingFact label="Additional Gear" value={briefing.additional_gear_notes} />}
+        {briefing?.notes && <BriefingFact label="Notes" value={briefing.notes} />}
+        {briefing?.wifi_network && (
+          <BriefingFact
+            label="Wifi"
+            value={briefing.wifi_password ? `${briefing.wifi_network} — ${briefing.wifi_password}` : briefing.wifi_network}
+          />
+        )}
+        {briefing && visibleStaffPortalCustomFields(briefing.custom_fields).map((f) => (
+          <BriefingFact key={f.id} label={f.label} value={f.value} />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -274,7 +290,7 @@ function FullTimelineSection({
   fullDay: StaffPortalTimelineDay | null;
 }) {
   return (
-    <details style={{ marginTop: 14 }}>
+    <details style={{ ...sectionBoxStyle, marginTop: 14 }}>
       <summary
         style={{
           cursor: "pointer",
@@ -282,6 +298,7 @@ function FullTimelineSection({
           display: "flex",
           alignItems: "center",
           gap: 6,
+          marginBottom: 12,
           fontSize: 15,
           fontWeight: 700,
           color: "var(--navy)",
@@ -289,7 +306,7 @@ function FullTimelineSection({
       >
         <ListOrdered size={13} /> View Full Timeline
       </summary>
-      <div style={{ marginTop: 8 }}>
+      <div>
         {!fullDay || !timelineFields ? (
           <div style={{ fontSize: 15, color: "var(--muted)" }}>Timeline not sent yet.</div>
         ) : (
@@ -478,7 +495,7 @@ export default async function TeamPage({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn-secondary"
-                            style={{ flex: 1, justifyContent: "center" }}
+                            style={{ flex: 1, justifyContent: "center", background: "var(--navy)", color: "#fff", border: "none" }}
                           >
                             <Images size={13} /> Setup Photos <ExternalLink size={12} />
                           </a>
@@ -489,7 +506,7 @@ export default async function TeamPage({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn-secondary"
-                            style={{ flex: 1, justifyContent: "center" }}
+                            style={{ flex: 1, justifyContent: "center", background: "var(--navy)", color: "#fff", border: "none" }}
                           >
                             <Images size={13} /> Reference Photos <ExternalLink size={12} />
                           </a>
@@ -497,13 +514,15 @@ export default async function TeamPage({
                       </div>
                     )}
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, marginBottom: 6, fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                      <Clock size={12} /> Schedule
-                    </div>
-                    <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
-                      <TimeStat label="Arrival" value={times.arrival} />
-                      <TimeStat label="Start" value={times.start} />
-                      <TimeStat label="End" value={times.end} />
+                    <div style={{ ...sectionBoxStyle, marginTop: 14 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                        <Clock size={12} /> Schedule
+                      </div>
+                      <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+                        <TimeStat label="Arrival" value={times.arrival} />
+                        <TimeStat label="Start" value={times.start} />
+                        <TimeStat label="End" value={times.end} />
+                      </div>
                     </div>
 
                     <DayBriefingSection
