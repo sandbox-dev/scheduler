@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 
-// Scoped to just the /crew routes — this is the part of the app meant to be
+// Scoped to just the /team routes — this is the part of the app meant to be
 // added to a phone's home screen (see app/manifest.ts), so it gets its own
 // theme-color + "open without browser chrome" meta tags. The owner-facing
 // (owner) routes are untouched.
@@ -23,6 +23,6 @@ export const viewport: Viewport = {
   themeColor: "#3B5B6A",
 };
 
-export default function CrewLayout({ children }: { children: React.ReactNode }) {
+export default function TeamLayout({ children }: { children: React.ReactNode }) {
   return <div style={{ background: "var(--bg)", minHeight: "100dvh" }}>{children}</div>;
 }

@@ -4,9 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 // /api/webhooks and /api/cron are intentionally public here — those routes
 // authenticate themselves via a shared secret (ZAPIER_WEBHOOK_SECRET /
 // CRON_SECRET), since external triggers like Zapier and Vercel Cron have no
-// logged-in session for this middleware to check. /crew/login is the staff
+// logged-in session for this middleware to check. /team/login is the staff
 // portal's own sign-in page, same idea as /login for owners.
-const PUBLIC_PATHS = ["/login", "/crew/login", "/availability", "/auth", "/api/webhooks", "/api/cron"];
+const PUBLIC_PATHS = ["/login", "/team/login", "/availability", "/auth", "/api/webhooks", "/api/cron"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -16,7 +16,7 @@ function isPublicPath(pathname: string) {
 // staff.auth_user_id / is_staff_account() in supabase/schema.sql) that must
 // never wander into the owner-only routes below, and that owners should
 // never end up stuck inside by mistake.
-const STAFF_AREA_PATH = "/crew";
+const STAFF_AREA_PATH = "/team";
 
 function isStaffAreaPath(pathname: string) {
   return pathname === STAFF_AREA_PATH || pathname.startsWith(`${STAFF_AREA_PATH}/`);
@@ -53,7 +53,7 @@ export async function updateSession(request: NextRequest) {
   if (!user) {
     if (!isPublicPath(pathname)) {
       const url = request.nextUrl.clone();
-      url.pathname = isStaffAreaPath(pathname) ? "/crew/login" : "/login";
+      url.pathname = isStaffAreaPath(pathname) ? "/team/login" : "/login";
       return NextResponse.redirect(url);
     }
     return response;
@@ -67,9 +67,9 @@ export async function updateSession(request: NextRequest) {
   const { data: staffRow } = await supabase.from("staff").select("id").eq("auth_user_id", user.id).maybeSingle();
   const isStaffAccount = !!staffRow;
 
-  if (pathname === "/login" || pathname === "/crew/login") {
+  if (pathname === "/login" || pathname === "/team/login") {
     const url = request.nextUrl.clone();
-    url.pathname = isStaffAccount ? "/crew" : "/overview";
+    url.pathname = isStaffAccount ? "/team" : "/overview";
     return NextResponse.redirect(url);
   }
 
@@ -77,7 +77,7 @@ export async function updateSession(request: NextRequest) {
     // A staff-scoped login trying to reach an owner route — send them back
     // to their own area instead of letting them in.
     const url = request.nextUrl.clone();
-    url.pathname = "/crew";
+    url.pathname = "/team";
     return NextResponse.redirect(url);
   }
 

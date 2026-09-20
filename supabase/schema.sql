@@ -678,12 +678,14 @@ create policy "owners full access" on availability_send_log for all to authentic
 -- explicitly sets an override.
 alter table staff add column if not exists role_priority jsonb not null default '{}'::jsonb;
 
--- A Google Drive link to the school's existing shared setup/reference
--- photos folder — nullable, shown on both the owner Jobs page
--- (ReferencePhotosInput) and the mobile staff view below. Only an owner can
--- ever write it (see the staff-scoped write-blocking policies below); no
--- staff-facing edit UI exists.
-alter table jobs add column if not exists reference_photos_url text;
+-- Reference/setup photos turned out to be a per-SCHOOL fact, not per-job —
+-- see schools.reference_photos_url / schools.setup_photos_url further down
+-- this file for the real fields. This column was added earlier the same
+-- day (PR #23) on a wrong assumption about Adi's actual Google Drive
+-- structure (one folder per school, not per job) and corrected before any
+-- real data was ever entered into it — safe to drop outright, no migration
+-- needed.
+alter table jobs drop column if exists reference_photos_url;
 
 -- Free-text notes tied to the SCHOOL (parking, gate codes, entry
 -- instructions, "check in at the front office" etc.) — reusable every time
@@ -694,7 +696,7 @@ alter table jobs add column if not exists reference_photos_url text;
 -- only their own tb_* tables — see staff_portal_timeline_for_days below for
 -- the one place the two apps' data cross, and it doesn't touch this
 -- column). Owner-editable from the Jobs page's Saved Schools panel
--- (SchoolsPanel.tsx); read-only on the staff view (/crew).
+-- (SchoolsPanel.tsx); read-only on the staff view (/team).
 --
 -- On RLS: no new policy was needed for this column. Postgres row-level
 -- security filters entire ROWS, not individual columns — the existing
@@ -712,6 +714,27 @@ alter table jobs add column if not exists reference_photos_url text;
 -- those real column-level mechanisms — a RESTRICTIVE row policy can't do
 -- it, since it can only block whole rows.
 alter table schools add column if not exists staff_notes text;
+
+-- Two Google Drive folder links, per SCHOOL (every job at that school shares
+-- them, not one per job — see the jobs.reference_photos_url comment above
+-- for the wrong per-job version this replaces). Adi's real Drive structure:
+-- one "Photographer Reference Folder" containing one subfolder per school,
+-- and inside each school's subfolder two subfolders — "Setup Photos" (gear
+-- setup photos, sometimes further split by year inside Drive itself; that
+-- year layer isn't modeled here, this just links to the parent folder) and
+-- "Reference Photos" (photos from previous Picture Days at that school).
+-- Both nullable, both owner-editable only, from the Saved Schools panel
+-- (SchoolsPanel.tsx) — same "own row" pattern as staff_notes above. Shown
+-- to staff on the mobile Team view (/team), same as staff_notes.
+--
+-- On RLS: no new policy needed here either, for the exact same reason as
+-- staff_notes' own comment above — Postgres RLS filters whole ROWS, not
+-- individual columns, and the existing "staff-scoped read own schools"
+-- RESTRICTIVE policy below already lets a staff-scoped login SELECT the
+-- full row of any school behind a job it's assigned to. A plain new nullable
+-- column on that same table is automatically included in that same read.
+alter table schools add column if not exists reference_photos_url text;
+alter table schools add column if not exists setup_photos_url text;
 
 -- ---------- Staff portal: staff-scoped logins (read-only) ----------
 -- Everything above this point assumed "authenticated" means "an owner"
@@ -1102,7 +1125,7 @@ $$;
 grant execute on function staff_portal_full_timeline_for_days(uuid[]) to authenticated;
 
 -- ---------- Staff portal: Day Briefing (crew list + Pixifi Event Info) ----------
--- Adi wants a new "Day Briefing" section on /crew showing the same facts
+-- Adi wants a new "Day Briefing" section on /team showing the same facts
 -- currently hand-copied into Pixifi's own event notes for staff to read
 -- there (see timeline-builder's src/lib/pixifiEventInfo.ts). Three of the
 -- facts she asked for — school type, setups count, indoor/outdoor — are

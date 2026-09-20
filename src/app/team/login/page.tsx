@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useActionState } from "react";
 import { login } from "./actions";
 
-export default function CrewLoginPage() {
+export default function TeamLoginPage() {
   const [state, formAction, pending] = useActionState(login, undefined);
 
   return (

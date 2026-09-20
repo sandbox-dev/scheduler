@@ -68,26 +68,17 @@ export function SchoolRow({ school }: { school: School }) {
           </button>
         </td>
       </tr>
-      {/* Its own row rather than a 5th table column — a new column would
-          resize the ones above it (AGENTS.md §14's own warning about
-          table-layout: auto), and this field is used far less often than
-          the address/miles above it. */}
+      {/* Its own row rather than more table columns — new columns would
+          resize the ones above them (AGENTS.md §14's own warning about
+          table-layout: auto), and these fields are used far less often than
+          the address/miles above them. Staff Notes plus the two Drive
+          folder links are all staff-only school facts, so they share one
+          row and one caption. */}
       <tr style={flagged ? { background: "var(--gold-tint)" } : undefined}>
         <td colSpan={4} style={{ paddingTop: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              style={{
-                fontSize: 10.5,
-                fontWeight: 700,
-                color: "var(--muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Staff Notes
-            </span>
-            <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ flex: "2 1 220px" }}>
+              <div style={fieldLabelStyle}>Staff Notes</div>
               <SavableField
                 onSave={(value) => updateSchoolField(school.id, "staff_notes", value)}
                 defaultValue={school.staff_notes ?? ""}
@@ -95,10 +86,39 @@ export function SchoolRow({ school }: { school: School }) {
                 className="field-input-ghost"
               />
             </div>
+            <div style={{ flex: "1 1 160px" }}>
+              <div style={fieldLabelStyle}>Setup Photos</div>
+              <SavableField
+                onSave={(value) => updateSchoolField(school.id, "setup_photos_url", value)}
+                defaultValue={school.setup_photos_url ?? ""}
+                placeholder="Drive folder link"
+                className="field-input-ghost"
+              />
+            </div>
+            <div style={{ flex: "1 1 160px" }}>
+              <div style={fieldLabelStyle}>Reference Photos</div>
+              <SavableField
+                onSave={(value) => updateSchoolField(school.id, "reference_photos_url", value)}
+                defaultValue={school.reference_photos_url ?? ""}
+                placeholder="Drive folder link"
+                className="field-input-ghost"
+              />
+            </div>
           </div>
-          <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>Only staff see this — not shown to the school.</div>
+          <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
+            Only staff see these — not shown to the school.
+          </div>
         </td>
       </tr>
     </>
   );
 }
+
+const fieldLabelStyle: React.CSSProperties = {
+  fontSize: 10.5,
+  fontWeight: 700,
+  color: "var(--muted)",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  marginBottom: 3,
+};

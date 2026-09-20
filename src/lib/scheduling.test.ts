@@ -288,7 +288,6 @@ describe("generateSchedule", () => {
       school_type: "K-8",
       enrollment: null,
       locked: false,
-      reference_photos_url: null,
       picture_days: [],
       ...overrides,
     };
@@ -443,7 +442,6 @@ describe("assignEquipmentCases", () => {
       school_type: "K-8",
       enrollment: null,
       locked: false,
-      reference_photos_url: null,
       picture_days: [],
       ...overrides,
     };

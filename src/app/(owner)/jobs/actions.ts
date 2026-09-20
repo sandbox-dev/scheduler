@@ -90,7 +90,7 @@ export async function createJob(_prevState: CreateJobState, formData: FormData):
 
 export async function updateJobField(
   jobId: string,
-  field: "school_type" | "enrollment" | "reference_photos_url",
+  field: "school_type" | "enrollment",
   value: string | number | null
 ) {
   const supabase = await createClient();
@@ -99,7 +99,6 @@ export async function updateJobField(
     .update({ [field]: value })
     .eq("id", jobId);
   revalidatePath("/jobs");
-  if (field === "reference_photos_url") revalidatePath("/crew");
 }
 
 export async function toggleJobLock(jobId: string, locked: boolean) {
@@ -144,7 +143,7 @@ export async function updateDay(
 
 export async function updateSchoolField(
   schoolId: string,
-  field: "name" | "address" | "round_trip_miles" | "staff_notes",
+  field: "name" | "address" | "round_trip_miles" | "staff_notes" | "reference_photos_url" | "setup_photos_url",
   value: string | number
 ) {
   const supabase = await createClient();
@@ -154,8 +153,9 @@ export async function updateSchoolField(
     .eq("id", schoolId);
   revalidatePath("/jobs");
   revalidatePath("/staff");
-  // staff_notes is read on /crew — keep that in step with an edit here too.
-  revalidatePath("/crew");
+  // staff_notes/reference_photos_url/setup_photos_url are all read on
+  // /team — keep that in step with an edit here too.
+  revalidatePath("/team");
 }
 
 // Safe to delete any time — jobs.school_id is "on delete set null", so an

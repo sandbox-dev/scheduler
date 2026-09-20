@@ -11,7 +11,6 @@ import { RemoveJobButton } from "./RemoveJobButton";
 import { SchoolsPanel } from "./SchoolsPanel";
 import { SchoolTypeInput } from "./SchoolTypeInput";
 import { EnrollmentInput } from "./EnrollmentInput";
-import { ReferencePhotosInput } from "./ReferencePhotosInput";
 
 export default async function JobsPage({
   searchParams,
@@ -103,7 +102,6 @@ export default async function JobsPage({
                 <CategoryBadge category={job.category} />
                 <SchoolTypeInput jobId={job.id} schoolType={job.school_type} />
                 <EnrollmentInput jobId={job.id} enrollment={job.enrollment} />
-                <ReferencePhotosInput jobId={job.id} referencePhotosUrl={job.reference_photos_url} />
               </div>
             </div>
             <RemoveJobButton jobId={job.id} />
