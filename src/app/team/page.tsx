@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, StickyNote } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, StickyNote } from "lucide-react";
 import { Card, RoleTag } from "@/components/ui";
 import {
   getMyAssignments,
@@ -248,10 +248,11 @@ function TimelineBlockRow({ block }: { block: StaffPortalScheduledBlock }) {
     >
       <div style={{ fontSize: 16, fontWeight: 700, color: "var(--muted)", minWidth: 96, flexShrink: 0 }}>{time}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 700 }}>
-          {block.grade_label}
-          {block.age_band ? ` (${block.age_band})` : ""}
-        </div>
+        {/* age_band is purely internal scheduling data (duration/qualification
+            logic) — never shown on any real timeline (verified against
+            timeline-builder's own print page and owner timeline page, neither
+            of which reference it). Adi: "no one ever needs to see that." */}
+        <div style={{ fontSize: 16, fontWeight: 700 }}>{block.grade_label}</div>
         <div style={{ fontSize: 13, color: "var(--muted)" }}>{detailParts.join(" · ")}</div>
         {block.note_text && (
           <div style={{ fontSize: 13, fontStyle: "italic", color: "var(--muted)", marginTop: 2 }}>{block.note_text}</div>
@@ -373,8 +374,8 @@ export default async function TeamPage({
       <div className="top-bar no-print">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Image src="/logo.png" alt="Sandbox Photographers" width={64} height={26} style={{ objectFit: "contain" }} priority />
-            <div className="display" style={{ fontSize: 18, fontWeight: 700 }}>Hi, {firstName}</div>
+            <Image src="/logo.png" alt="Sandbox Photographers" width={84} height={34} style={{ objectFit: "contain" }} priority />
+            <div className="display" style={{ fontSize: 20, fontWeight: 700 }}>Hi, {firstName}</div>
           </div>
           <form action={logout}>
             <button className="btn-secondary" type="submit">
@@ -408,111 +409,129 @@ export default async function TeamPage({
             const fields = timelineTimes.get(a.picture_day.id) ?? null;
             const times = computeStaffPortalDayTimes(fields);
             return (
-              <Card key={a.id}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                      {formatDayLabel(a.picture_day.date, today)}
-                      {a.job_total_days > 1 ? ` · Day ${a.job_day_number} of ${a.job_total_days}` : ""}
+              <Card key={a.id} style={{ padding: 0 }}>
+                {/* Collapsed by default (Adi: less scrolling, see date +
+                    school at a glance) — a plain <details> so this needs no
+                    client state, same no-JS-collapse approach already used
+                    for the nested "View Full Timeline" section below.
+                    Assignments are sorted ascending by date and the default
+                    window starts at today (see weekStart above), so today's
+                    card — or the next upcoming one if nothing's scheduled
+                    today — is always first here with no scrolling needed;
+                    it still opens collapsed like every other card. */}
+                <details className="day-card">
+                  <summary className="day-card-summary" style={{ padding: "20px 22px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                          {formatDayLabel(a.picture_day.date, today)}
+                          {a.job_total_days > 1 ? ` · Day ${a.job_day_number} of ${a.job_total_days}` : ""}
+                        </div>
+                        <div className="display" style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>
+                          {a.school?.name ?? a.job.name}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                        <RoleTag role={a.role} />
+                        <ChevronDown size={18} className="day-card-chevron" style={{ color: "var(--muted)" }} />
+                      </div>
                     </div>
-                    <div className="display" style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>
-                      {a.school?.name ?? a.job.name}
-                    </div>
-                  </div>
-                  <RoleTag role={a.role} />
-                </div>
+                  </summary>
 
-                {a.school?.address && (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 10, fontSize: 16, color: "var(--muted)" }}>
-                    <MapPin size={13} style={{ marginTop: 1, flexShrink: 0 }} />
-                    {a.school.address}
-                  </div>
-                )}
+                  <div style={{ padding: "0 22px 20px" }}>
+                    {a.school?.address && (
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 2, fontSize: 16, color: "var(--muted)" }}>
+                        <MapPin size={13} style={{ marginTop: 1, flexShrink: 0 }} />
+                        {a.school.address}
+                      </div>
+                    )}
 
-                {/* Staff-only, tied to the school rather than this one job —
-                    never shown to the school (see staff_notes' own comment
-                    in supabase/schema.sql). Only rendered when an owner has
-                    actually entered something. */}
-                {a.school?.staff_notes && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 6,
-                      marginTop: 8,
-                      padding: "8px 10px",
-                      background: "var(--gold-tint)",
-                      borderRadius: 8,
-                    }}
-                  >
-                    <StickyNote size={13} style={{ marginTop: 1, flexShrink: 0, color: "var(--navy)" }} />
-                    <div>
+                    {/* Staff-only, tied to the school rather than this one job —
+                        never shown to the school (see staff_notes' own comment
+                        in supabase/schema.sql). Only rendered when an owner has
+                        actually entered something. */}
+                    {a.school?.staff_notes && (
                       <div
                         style={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: "var(--navy)",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
-                          marginBottom: 2,
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 6,
+                          marginTop: 8,
+                          padding: "8px 10px",
+                          background: "var(--gold-tint)",
+                          borderRadius: 8,
                         }}
                       >
-                        Location Notes
+                        <StickyNote size={13} style={{ marginTop: 1, flexShrink: 0, color: "var(--navy)" }} />
+                        <div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: "var(--navy)",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                              marginBottom: 2,
+                            }}
+                          >
+                            Location Notes
+                          </div>
+                          <div style={{ fontSize: 16, color: "var(--ink)" }}>{a.school.staff_notes}</div>
+                        </div>
                       </div>
-                      <div style={{ fontSize: 16, color: "var(--ink)" }}>{a.school.staff_notes}</div>
+                    )}
+
+                    {/* Per-SCHOOL Google Drive links (every job at this school
+                        shares the same two folders) — owner-set only, from the
+                        Saved Schools panel. Rendered together, right after
+                        Location Notes, since both are staff-only school facts. */}
+                    {(a.school?.setup_photos_url || a.school?.reference_photos_url) && (
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        {a.school?.setup_photos_url && (
+                          <a
+                            href={a.school.setup_photos_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-secondary"
+                            style={{ flex: 1, justifyContent: "center" }}
+                          >
+                            <Images size={13} /> Setup Photos <ExternalLink size={12} />
+                          </a>
+                        )}
+                        {a.school?.reference_photos_url && (
+                          <a
+                            href={a.school.reference_photos_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-secondary"
+                            style={{ flex: 1, justifyContent: "center" }}
+                          >
+                            <Images size={13} /> Reference Photos <ExternalLink size={12} />
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, marginBottom: 6, fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      <Clock size={12} /> Schedule
                     </div>
+                    <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+                      <TimeStat label="Arrival" value={times.arrival} />
+                      <TimeStat label="Start" value={times.start} />
+                      <TimeStat label="End" value={times.end} />
+                    </div>
+
+                    <DayBriefingSection
+                      job={a.job}
+                      pictureDay={a.picture_day}
+                      briefing={briefings.get(a.picture_day.id) ?? null}
+                      crew={crews.get(a.picture_day.id) ?? []}
+                      hasReferencePhotos={!!a.school?.reference_photos_url}
+                    />
+
+                    <FullTimelineSection timelineFields={fields} fullDay={fullTimelines.get(a.picture_day.id) ?? null} />
                   </div>
-                )}
-
-                {/* Per-SCHOOL Google Drive links (every job at this school
-                    shares the same two folders) — owner-set only, from the
-                    Saved Schools panel. Rendered together, right after
-                    Location Notes, since both are staff-only school facts. */}
-                {(a.school?.setup_photos_url || a.school?.reference_photos_url) && (
-                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    {a.school?.setup_photos_url && (
-                      <a
-                        href={a.school.setup_photos_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-secondary"
-                        style={{ flex: 1, justifyContent: "center" }}
-                      >
-                        <Images size={13} /> Setup Photos <ExternalLink size={12} />
-                      </a>
-                    )}
-                    {a.school?.reference_photos_url && (
-                      <a
-                        href={a.school.reference_photos_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-secondary"
-                        style={{ flex: 1, justifyContent: "center" }}
-                      >
-                        <Images size={13} /> Reference Photos <ExternalLink size={12} />
-                      </a>
-                    )}
-                  </div>
-                )}
-
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, marginBottom: 6, fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  <Clock size={12} /> Schedule
-                </div>
-                <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
-                  <TimeStat label="Arrival" value={times.arrival} />
-                  <TimeStat label="Start" value={times.start} />
-                  <TimeStat label="End" value={times.end} />
-                </div>
-
-                <DayBriefingSection
-                  job={a.job}
-                  pictureDay={a.picture_day}
-                  briefing={briefings.get(a.picture_day.id) ?? null}
-                  crew={crews.get(a.picture_day.id) ?? []}
-                  hasReferencePhotos={!!a.school?.reference_photos_url}
-                />
-
-                <FullTimelineSection timelineFields={fields} fullDay={fullTimelines.get(a.picture_day.id) ?? null} />
+                </details>
               </Card>
             );
           })
