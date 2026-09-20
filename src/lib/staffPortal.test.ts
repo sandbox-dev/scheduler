@@ -16,6 +16,7 @@ import {
   sortStaffPortalCrew,
   staffPortalSchoolTypeLabel,
   visibleStaffPortalCustomFields,
+  computeJobDayPosition,
   type StaffPortalBlock,
   type StaffPortalTimelineDay,
   type StaffPortalScheduledBlock,
@@ -415,5 +416,39 @@ describe("staffPortalSchoolTypeLabel", () => {
 
   it("falls back to category when school_type is only whitespace", () => {
     expect(staffPortalSchoolTypeLabel({ category: "K-12", school_type: "   " })).toBe("K-12");
+  });
+});
+
+describe("computeJobDayPosition", () => {
+  it("is day 1 of 1 for a genuinely single-day job", () => {
+    expect(computeJobDayPosition("2026-09-19", ["2026-09-19"])).toEqual({ dayNumber: 1, dayCount: 1 });
+  });
+
+  it("counts every day of the job, not just the ones this staff member is on", () => {
+    // The real bug this fixes: a staff member working ONLY the second day
+    // of a 2-day job must still see "Day 2 of 2," not "Day 1 of 1" — so the
+    // full list of the job's dates (not a personal subset) must be passed
+    // in, and this staff member's one day must rank correctly within it.
+    const allDatesForJob = ["2026-09-18", "2026-09-19"];
+    expect(computeJobDayPosition("2026-09-19", allDatesForJob)).toEqual({ dayNumber: 2, dayCount: 2 });
+    expect(computeJobDayPosition("2026-09-18", allDatesForJob)).toEqual({ dayNumber: 1, dayCount: 2 });
+  });
+
+  it("ranks correctly regardless of input order", () => {
+    const allDatesForJob = ["2026-09-21", "2026-09-19", "2026-09-20"];
+    expect(computeJobDayPosition("2026-09-20", allDatesForJob)).toEqual({ dayNumber: 2, dayCount: 3 });
+  });
+
+  it("dedupes two picture_days rows sharing the same calendar date", () => {
+    const allDatesForJob = ["2026-09-19", "2026-09-19", "2026-09-20"];
+    expect(computeJobDayPosition("2026-09-20", allDatesForJob)).toEqual({ dayNumber: 2, dayCount: 2 });
+  });
+
+  it("falls back to day 1 of 1 if thisDate is somehow not in the list (defensive only)", () => {
+    expect(computeJobDayPosition("2026-09-25", ["2026-09-19", "2026-09-20"])).toEqual({ dayNumber: 1, dayCount: 2 });
+  });
+
+  it("handles an empty list without throwing", () => {
+    expect(computeJobDayPosition("2026-09-19", [])).toEqual({ dayNumber: 1, dayCount: 1 });
   });
 });

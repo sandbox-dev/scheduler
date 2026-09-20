@@ -319,6 +319,34 @@ export function computeStaffPortalTimelineRows(day: StaffPortalTimelineDay): Sta
   return applyStaffPortalArrivalGrouping(orderStaffPortalRows(computeStaffPortalBlockTimes(day)));
 }
 
+// ---------- Job day position ("Day N of M") ----------
+// Fixed 2026-09-19: this used to be computed from only the Picture Days a
+// staff member is personally assigned to on a job, which reflected "how
+// many days of this job am I on," not the job's real total day count — a
+// staff member covering just one day of a multi-day job couldn't tell
+// whether they were walking into a job that actually started days earlier.
+// Now computed from EVERY Picture Day the job has (see the widened
+// "staff-scoped read own picture days" RLS policy in supabase/schema.sql,
+// which is what makes those other days' dates visible at all) — this is the
+// job's real day_number/day_count, not a personal subset of it.
+export type JobDayPosition = { dayNumber: number; dayCount: number };
+
+// `allDatesForJob` is every Picture Day date on the job (YYYY-MM-DD),
+// regardless of who's assigned to which — may contain duplicate dates (two
+// picture_days rows sharing one calendar date, e.g. two separate bookings
+// landing on the same day), deduped here before ranking. `thisDate` must be
+// one of them; if it somehow isn't (defensive only — shouldn't happen since
+// the caller always includes the day being rendered), this falls back to
+// treating it as a lone day-1-of-1 rather than throwing.
+export function computeJobDayPosition(thisDate: string, allDatesForJob: string[]): JobDayPosition {
+  const uniqueSortedDates = [...new Set(allDatesForJob.length ? allDatesForJob : [thisDate])].sort();
+  const index = uniqueSortedDates.indexOf(thisDate);
+  return {
+    dayNumber: index === -1 ? 1 : index + 1,
+    dayCount: uniqueSortedDates.length,
+  };
+}
+
 // ---------- Day Briefing (crew list + Pixifi Event Info facts) ----------
 // See staff_portal_crew_for_days() / staff_portal_briefing_for_days() in
 // supabase/schema.sql for where these come from and the security shape
