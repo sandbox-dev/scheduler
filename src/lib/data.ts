@@ -216,12 +216,14 @@ export type StaffPortalAssignment = {
   equipment_case: string;
   picture_day: { id: string; date: string; setups: number; is_outdoor: boolean };
   job: { id: string; name: string; category: string; school_type: string };
+  // Deliberately minimal — location_notes/reference_photos_url/
+  // setup_photos_url used to live here too (this app's own schools.
+  // staff_notes/reference_photos_url/setup_photos_url); moved to Timeline
+  // Builder's tb_schools 2026-09-19 and read via getStaffPortalBriefing()
+  // below instead, alongside every other cross-app Details fact.
   school: {
     name: string;
     address: string;
-    staff_notes: string | null;
-    reference_photos_url: string | null;
-    setup_photos_url: string | null;
   } | null;
   // "Day N of M" for a multi-day job — the job's REAL day count and this
   // day's real position in it (fixed 2026-09-19; see computeJobDayPosition()
@@ -271,19 +273,9 @@ export async function getMyAssignments(
 
   const schoolIds = [...new Set((jobs || []).map((j) => j.school_id).filter((id): id is string => !!id))];
   const { data: schools, error: schoolsError } = schoolIds.length
-    ? await supabase
-        .from("schools")
-        .select("id, name, address, staff_notes, reference_photos_url, setup_photos_url")
-        .in("id", schoolIds)
+    ? await supabase.from("schools").select("id, name, address").in("id", schoolIds)
     : {
-        data: [] as {
-          id: string;
-          name: string;
-          address: string;
-          staff_notes: string | null;
-          reference_photos_url: string | null;
-          setup_photos_url: string | null;
-        }[],
+        data: [] as { id: string; name: string; address: string }[],
         error: null,
       };
   if (schoolsError) throw schoolsError;
@@ -329,9 +321,6 @@ export async function getMyAssignments(
           ? {
               name: school.name,
               address: school.address,
-              staff_notes: school.staff_notes,
-              reference_photos_url: school.reference_photos_url,
-              setup_photos_url: school.setup_photos_url,
             }
           : null,
         job_day_number: dayNumber,
@@ -477,6 +466,9 @@ export async function getStaffPortalBriefing(
           additional_gear_notes: string | null;
           parking_notes: string | null;
           custom_fields: { id: string; label: string; value: string }[] | null;
+          location_notes: string | null;
+          reference_photos_url: string | null;
+          setup_photos_url: string | null;
         }[]
       ).map((r) => [
         r.picture_day_id,
@@ -490,6 +482,9 @@ export async function getStaffPortalBriefing(
           additional_gear_notes: r.additional_gear_notes,
           parking_notes: r.parking_notes,
           custom_fields: r.custom_fields ?? [],
+          location_notes: r.location_notes,
+          reference_photos_url: r.reference_photos_url,
+          setup_photos_url: r.setup_photos_url,
         },
       ])
     );

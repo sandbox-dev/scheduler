@@ -376,6 +376,14 @@ export type StaffPortalBriefingFields = {
   additional_gear_notes: string | null;
   parking_notes: string | null;
   custom_fields: StaffPortalCustomField[];
+  // Moved 2026-09-19 from this app's own schools.staff_notes/
+  // reference_photos_url/setup_photos_url to Timeline Builder's tb_schools
+  // (location_notes/reference_photos_url/setup_photos_url there) — see
+  // staff_portal_briefing_for_days()'s own comment in supabase/schema.sql.
+  // Same "independently null" shape as every other field here.
+  location_notes: string | null;
+  reference_photos_url: string | null;
+  setup_photos_url: string | null;
 };
 
 // A custom field Adi added with no value filled in yet shouldn't clutter
