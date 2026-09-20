@@ -215,8 +215,14 @@ export type StaffPortalAssignment = {
   role: Role;
   equipment_case: string;
   picture_day: { id: string; date: string; setups: number; is_outdoor: boolean };
-  job: { id: string; name: string; reference_photos_url: string | null; category: string; school_type: string };
-  school: { name: string; address: string; staff_notes: string | null } | null;
+  job: { id: string; name: string; category: string; school_type: string };
+  school: {
+    name: string;
+    address: string;
+    staff_notes: string | null;
+    reference_photos_url: string | null;
+    setup_photos_url: string | null;
+  } | null;
 };
 
 // Every Picture Day this staff member is assigned to, from fromDate through
@@ -242,15 +248,28 @@ export async function getMyAssignments(
 
   const [{ data: pictureDays, error: pdError }, { data: jobs, error: jobsError }] = await Promise.all([
     supabase.from("picture_days").select("id, date, setups, is_outdoor").in("id", pictureDayIds),
-    supabase.from("jobs").select("id, name, school_id, reference_photos_url, category, school_type").in("id", jobIds),
+    supabase.from("jobs").select("id, name, school_id, category, school_type").in("id", jobIds),
   ]);
   if (pdError) throw pdError;
   if (jobsError) throw jobsError;
 
   const schoolIds = [...new Set((jobs || []).map((j) => j.school_id).filter((id): id is string => !!id))];
   const { data: schools, error: schoolsError } = schoolIds.length
-    ? await supabase.from("schools").select("id, name, address, staff_notes").in("id", schoolIds)
-    : { data: [] as { id: string; name: string; address: string; staff_notes: string | null }[], error: null };
+    ? await supabase
+        .from("schools")
+        .select("id, name, address, staff_notes, reference_photos_url, setup_photos_url")
+        .in("id", schoolIds)
+    : {
+        data: [] as {
+          id: string;
+          name: string;
+          address: string;
+          staff_notes: string | null;
+          reference_photos_url: string | null;
+          setup_photos_url: string | null;
+        }[],
+        error: null,
+      };
   if (schoolsError) throw schoolsError;
 
   const pictureDayById = new Map((pictureDays || []).map((pd) => [pd.id as string, pd]));
@@ -272,11 +291,18 @@ export async function getMyAssignments(
         job: {
           id: job.id,
           name: job.name,
-          reference_photos_url: job.reference_photos_url,
           category: job.category,
           school_type: job.school_type,
         },
-        school: school ? { name: school.name, address: school.address, staff_notes: school.staff_notes } : null,
+        school: school
+          ? {
+              name: school.name,
+              address: school.address,
+              staff_notes: school.staff_notes,
+              reference_photos_url: school.reference_photos_url,
+              setup_photos_url: school.setup_photos_url,
+            }
+          : null,
       };
     })
     .filter((a): a is StaffPortalAssignment => a !== null)

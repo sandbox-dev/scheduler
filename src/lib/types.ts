@@ -37,6 +37,12 @@ export type School = {
   // for why no extra RLS was needed for that. Null/empty means nothing's
   // been entered yet.
   staff_notes: string | null;
+  // Two Google Drive folder links, per SCHOOL (every job at that school
+  // shares them) — one for gear/setup photos, one for photos from previous
+  // Picture Days there. Owner-set only, from the Saved Schools panel; shown
+  // to staff on the mobile Team view. Null means nothing's been entered yet.
+  reference_photos_url: string | null;
+  setup_photos_url: string | null;
 };
 
 export type Job = {
@@ -53,9 +59,6 @@ export type Job = {
   // When true, Regenerate skips this job and its Schedule slots are
   // read-only until unlocked. Set automatically when a month is approved.
   locked: boolean;
-  // Link to the school's existing shared Google Drive folder for setup/
-  // reference photos — shown on the staff view. Owner-set only.
-  reference_photos_url: string | null;
 };
 
 export type PictureDay = {

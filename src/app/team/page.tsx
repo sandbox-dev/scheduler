@@ -68,7 +68,7 @@ function BriefingFact({ label, value }: { label: string; value: string }) {
 // Pixifi's own event notes for staff to read there, shown natively and
 // formatted for a phone screen instead of a raw copy-paste block. Rendered
 // inline (not a collapsible <details> like Full Timeline below) — a
-// handful of short facts plus a short crew list reads fine on one screen,
+// handful of short facts plus a short team list reads fine on one screen,
 // unlike the long block-by-block timeline that section exists to hide by
 // default.
 function DayBriefingSection({
@@ -97,7 +97,7 @@ function DayBriefingSection({
           letterSpacing: "0.04em",
         }}
       >
-        <ClipboardList size={12} /> Day Briefing
+        <ClipboardList size={12} /> Details
       </div>
 
       <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
@@ -135,7 +135,7 @@ function DayBriefingSection({
               marginBottom: 4,
             }}
           >
-            Crew
+            Team
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {crew.map((member, i) => (
@@ -307,7 +307,7 @@ function FullTimelineSection({
   );
 }
 
-export default async function CrewPage() {
+export default async function TeamPage() {
   const account = await getMyStaffAccount();
 
   // Shouldn't normally happen — the proxy only ever routes a linked
@@ -423,6 +423,37 @@ export default async function CrewPage() {
                   </div>
                 )}
 
+                {/* Per-SCHOOL Google Drive links (every job at this school
+                    shares the same two folders) — owner-set only, from the
+                    Saved Schools panel. Rendered together, right after
+                    Location Notes, since both are staff-only school facts. */}
+                {(a.school?.setup_photos_url || a.school?.reference_photos_url) && (
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    {a.school?.setup_photos_url && (
+                      <a
+                        href={a.school.setup_photos_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-secondary"
+                        style={{ flex: 1, justifyContent: "center" }}
+                      >
+                        <Images size={13} /> Setup Photos <ExternalLink size={12} />
+                      </a>
+                    )}
+                    {a.school?.reference_photos_url && (
+                      <a
+                        href={a.school.reference_photos_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-secondary"
+                        style={{ flex: 1, justifyContent: "center" }}
+                      >
+                        <Images size={13} /> Reference Photos <ExternalLink size={12} />
+                      </a>
+                    )}
+                  </div>
+                )}
+
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, marginBottom: 6, fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   <Clock size={12} /> Schedule
                 </div>
@@ -440,18 +471,6 @@ export default async function CrewPage() {
                 />
 
                 <FullTimelineSection timelineFields={fields} fullDay={fullTimelines.get(a.picture_day.id) ?? null} />
-
-                {a.job.reference_photos_url && (
-                  <a
-                    href={a.job.reference_photos_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-secondary"
-                    style={{ marginTop: 14, width: "100%", justifyContent: "center" }}
-                  >
-                    <Images size={13} /> Reference Photos <ExternalLink size={12} />
-                  </a>
-                )}
               </Card>
             );
           })
