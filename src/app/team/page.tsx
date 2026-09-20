@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, StickyNote } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin } from "lucide-react";
 import { Card, RoleTag } from "@/components/ui";
 import {
   getMyAssignments,
@@ -449,37 +449,13 @@ export default async function TeamPage({
                     {/* Staff-only, tied to the school rather than this one job —
                         never shown to the school (see staff_notes' own comment
                         in supabase/schema.sql). Only rendered when an owner has
-                        actually entered something. */}
-                    {a.school?.staff_notes && (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 6,
-                          marginTop: 8,
-                          padding: "8px 10px",
-                          background: "var(--gold-tint)",
-                          borderRadius: 8,
-                        }}
-                      >
-                        <StickyNote size={13} style={{ marginTop: 1, flexShrink: 0, color: "var(--navy)" }} />
-                        <div>
-                          <div
-                            style={{
-                              fontSize: 13,
-                              fontWeight: 700,
-                              color: "var(--navy)",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.04em",
-                              marginBottom: 2,
-                            }}
-                          >
-                            Location Notes
-                          </div>
-                          <div style={{ fontSize: 16, color: "var(--ink)" }}>{a.school.staff_notes}</div>
-                        </div>
-                      </div>
-                    )}
+                        actually entered something. Plain BriefingFact styling
+                        (Adi: the earlier gold-tinted callout box read as an
+                        "alert" and made an often-empty fact the loudest thing
+                        on the card) — same quiet label-over-text treatment as
+                        Parking Notes/Backdrop/every other Details fact below,
+                        not a special one-off style. */}
+                    {a.school?.staff_notes && <BriefingFact label="Location Notes" value={a.school.staff_notes} />}
 
                     {/* Per-SCHOOL Google Drive links (every job at this school
                         shares the same two folders) — owner-set only, from the
