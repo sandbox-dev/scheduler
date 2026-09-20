@@ -143,7 +143,7 @@ export async function updateDay(
 
 export async function updateSchoolField(
   schoolId: string,
-  field: "name" | "address" | "round_trip_miles" | "staff_notes" | "reference_photos_url" | "setup_photos_url",
+  field: "name" | "address" | "round_trip_miles",
   value: string | number
 ) {
   const supabase = await createClient();
@@ -153,9 +153,6 @@ export async function updateSchoolField(
     .eq("id", schoolId);
   revalidatePath("/jobs");
   revalidatePath("/staff");
-  // staff_notes/reference_photos_url/setup_photos_url are all read on
-  // /team — keep that in step with an edit here too.
-  revalidatePath("/team");
 }
 
 // Safe to delete any time — jobs.school_id is "on delete set null", so an

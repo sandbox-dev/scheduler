@@ -408,6 +408,7 @@ export default async function TeamPage({
           assignments.map((a) => {
             const fields = timelineTimes.get(a.picture_day.id) ?? null;
             const times = computeStaffPortalDayTimes(fields);
+            const briefing = briefings.get(a.picture_day.id) ?? null;
             return (
               <Card key={a.id} style={{ padding: 0 }}>
                 {/* Collapsed by default (Adi: less scrolling, see date +
@@ -447,25 +448,33 @@ export default async function TeamPage({
                     )}
 
                     {/* Staff-only, tied to the school rather than this one job —
-                        never shown to the school (see staff_notes' own comment
-                        in supabase/schema.sql). Only rendered when an owner has
+                        lives on Timeline Builder's tb_schools.location_notes
+                        now (moved 2026-09-19 from this app's own
+                        schools.staff_notes so a school's details have one
+                        home instead of two — see staff_portal_briefing_for_
+                        days()'s own comment in supabase/schema.sql), read
+                        through the same `briefing` data as every other
+                        Details fact below. Only rendered when an owner has
                         actually entered something. Plain BriefingFact styling
                         (Adi: the earlier gold-tinted callout box read as an
                         "alert" and made an often-empty fact the loudest thing
                         on the card) — same quiet label-over-text treatment as
                         Parking Notes/Backdrop/every other Details fact below,
                         not a special one-off style. */}
-                    {a.school?.staff_notes && <BriefingFact label="Location Notes" value={a.school.staff_notes} />}
+                    {briefing?.location_notes && <BriefingFact label="Location Notes" value={briefing.location_notes} />}
 
                     {/* Per-SCHOOL Google Drive links (every job at this school
-                        shares the same two folders) — owner-set only, from the
-                        Saved Schools panel. Rendered together, right after
-                        Location Notes, since both are staff-only school facts. */}
-                    {(a.school?.setup_photos_url || a.school?.reference_photos_url) && (
+                        shares the same two folders) — also moved to
+                        tb_schools 2026-09-19, owner-set from Timeline
+                        Builder's School Details page now instead of this
+                        app's own Saved Schools panel. Rendered together,
+                        right after Location Notes, since both are staff-only
+                        school facts. */}
+                    {(briefing?.setup_photos_url || briefing?.reference_photos_url) && (
                       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        {a.school?.setup_photos_url && (
+                        {briefing?.setup_photos_url && (
                           <a
-                            href={a.school.setup_photos_url}
+                            href={briefing.setup_photos_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn-secondary"
@@ -474,9 +483,9 @@ export default async function TeamPage({
                             <Images size={13} /> Setup Photos <ExternalLink size={12} />
                           </a>
                         )}
-                        {a.school?.reference_photos_url && (
+                        {briefing?.reference_photos_url && (
                           <a
-                            href={a.school.reference_photos_url}
+                            href={briefing.reference_photos_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn-secondary"
@@ -500,9 +509,9 @@ export default async function TeamPage({
                     <DayBriefingSection
                       job={a.job}
                       pictureDay={a.picture_day}
-                      briefing={briefings.get(a.picture_day.id) ?? null}
+                      briefing={briefing}
                       crew={crews.get(a.picture_day.id) ?? []}
-                      hasReferencePhotos={!!a.school?.reference_photos_url}
+                      hasReferencePhotos={!!briefing?.reference_photos_url}
                     />
 
                     <FullTimelineSection timelineFields={fields} fullDay={fullTimelines.get(a.picture_day.id) ?? null} />

@@ -26,23 +26,21 @@ export type Role = (typeof ROLES)[number];
 export const STUDIO_ADDRESS = "817 Arnold Dr, Martinez, CA 94553";
 export const MILEAGE_RATE = 0.75;
 
+// Deliberately minimal — Adi, 2026-09-19: "the only thing we add about a
+// school in the scheduler is the address, for the purpose of schedule and
+// payroll. but all the rest of the school details live in the timeline
+// builder." staff_notes/reference_photos_url/setup_photos_url used to live
+// here too; moved to Timeline Builder's tb_schools (location_notes/
+// reference_photos_url/setup_photos_url there) so a school's details have
+// one home instead of two. Read on /team via the existing cross-app
+// staff_portal_briefing_for_days() function — see that function's own
+// comment in supabase/schema.sql.
 export type School = {
   id: string;
   name: string;
   address: string;
   round_trip_miles: number;
   address_unresolvable: boolean;
-  // Free-text, staff-only (parking, gate codes, entry instructions) — never
-  // shown to the school. See the column's own comment in supabase/schema.sql
-  // for why no extra RLS was needed for that. Null/empty means nothing's
-  // been entered yet.
-  staff_notes: string | null;
-  // Two Google Drive folder links, per SCHOOL (every job at that school
-  // shares them) — one for gear/setup photos, one for photos from previous
-  // Picture Days there. Owner-set only, from the Saved Schools panel; shown
-  // to staff on the mobile Team view. Null means nothing's been entered yet.
-  reference_photos_url: string | null;
-  setup_photos_url: string | null;
 };
 
 export type Job = {

@@ -679,62 +679,67 @@ create policy "owners full access" on availability_send_log for all to authentic
 alter table staff add column if not exists role_priority jsonb not null default '{}'::jsonb;
 
 -- Reference/setup photos turned out to be a per-SCHOOL fact, not per-job —
--- see schools.reference_photos_url / schools.setup_photos_url further down
--- this file for the real fields. This column was added earlier the same
--- day (PR #23) on a wrong assumption about Adi's actual Google Drive
--- structure (one folder per school, not per job) and corrected before any
--- real data was ever entered into it — safe to drop outright, no migration
--- needed.
+-- this column was added earlier the same day (PR #23) on a wrong assumption
+-- about Adi's actual Google Drive structure (one folder per school, not per
+-- job) and corrected before any real data was ever entered into it — safe
+-- to drop outright, no migration needed. The per-school fields this
+-- assumption was corrected to (schools.reference_photos_url /
+-- schools.setup_photos_url) were themselves later moved out to Timeline
+-- Builder's tb_schools (see the staff_notes/reference_photos_url/
+-- setup_photos_url migration further down this file for why and how).
 alter table jobs drop column if exists reference_photos_url;
 
--- Free-text notes tied to the SCHOOL (parking, gate codes, entry
--- instructions, "check in at the front office" etc.) — reusable every time
--- crew works that location, unlike a job-specific note. Adi, 2026-09-19:
--- staff-only, never shown to the school. That's naturally true here, not
--- just an RLS rule: this app's `schools` table is never read by
--- timeline-builder's school-facing approval/portal pages at all (they read
--- only their own tb_* tables — see staff_portal_timeline_for_days below for
--- the one place the two apps' data cross, and it doesn't touch this
--- column). Owner-editable from the Jobs page's Saved Schools panel
--- (SchoolsPanel.tsx); read-only on the staff view (/team).
+-- staff_notes / reference_photos_url / setup_photos_url (added earlier the
+-- same day, PR #23/#24/#28) moved OUT to Timeline Builder's tb_schools
+-- (location_notes / reference_photos_url / setup_photos_url there) — Adi
+-- caught schools being edited in two different places at once (this app's
+-- Jobs page AND Timeline Builder's School Details page) and asked for one
+-- home: "the only thing we add about a school in the scheduler is the
+-- address, for the purpose of schedule and payroll. but all the rest of the
+-- school details live in the timeline builder." Read back here on /team
+-- through the existing staff_portal_briefing_for_days() function further
+-- down this file, extended to also select those three tb_schools columns —
+-- same cross-app shape as backdrop/wifi/parking_notes already use there,
+-- rather than a direct grant on this app's own now-narrower `schools` table.
 --
--- On RLS: no new policy was needed for this column. Postgres row-level
--- security filters entire ROWS, not individual columns — the existing
--- "staff-scoped read own schools" policy above already lets a staff-scoped
--- login SELECT the full row of any school behind a job they're assigned
--- to, so a plain new column on that same table is automatically included
--- in that same read. True column-level hiding would need a column
--- GRANT/REVOKE or a security-definer view carved down to specific columns —
--- neither is needed here because there's no principal in this database
--- that can read `schools` and should NOT see staff_notes: owners see
--- everything by design, staff-scoped logins are meant to see it (that's
--- the whole point of this column), and the school itself has no login here
--- at all (see above). If a future column on `schools` ever needs to be
--- hidden from staff-scoped logins specifically, that would need one of
--- those real column-level mechanisms — a RESTRICTIVE row policy can't do
--- it, since it can only block whole rows.
-alter table schools add column if not exists staff_notes text;
+-- Whatever Adi already typed into these three columns today is copied over
+-- to the matching tb_schools row by name before they're dropped, so nothing
+-- entered gets silently lost. This needs Timeline Builder's own
+-- supabase/schema.sql (which adds the three tb_schools columns above) to
+-- have already been run in this same database — paste that one first. If it
+-- hasn't been, the `update tb_schools ...` below fails on a genuinely
+-- missing column and stops this whole script before anything is dropped,
+-- rather than silently proceeding. Guarded the same way as the
+-- equipment_case migration above so re-running this script afterward is a
+-- no-op, not an error, once staff_notes is already gone. Matches by exact
+-- (case/whitespace-insensitive) name — a school whose name differs between
+-- the two apps (a typo on one side, "Makeup Day" suffix, etc.) won't match
+-- and needs Adi to copy that one school's value over by hand afterward,
+-- same one-off cleanup she already does for schools that don't match
+-- elsewhere in this app (see the Pixifi make-up-day dedup fix below).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'schools' and column_name = 'staff_notes'
+  ) then
+    update tb_schools ts
+    set
+      location_notes = case
+        when coalesce(ts.location_notes, '') = '' then coalesce(s.staff_notes, '')
+        else ts.location_notes
+      end,
+      reference_photos_url = coalesce(ts.reference_photos_url, s.reference_photos_url),
+      setup_photos_url = coalesce(ts.setup_photos_url, s.setup_photos_url)
+    from schools s
+    where lower(trim(ts.name)) = lower(trim(s.name))
+      and (coalesce(s.staff_notes, '') <> '' or s.reference_photos_url is not null or s.setup_photos_url is not null);
 
--- Two Google Drive folder links, per SCHOOL (every job at that school shares
--- them, not one per job — see the jobs.reference_photos_url comment above
--- for the wrong per-job version this replaces). Adi's real Drive structure:
--- one "Photographer Reference Folder" containing one subfolder per school,
--- and inside each school's subfolder two subfolders — "Setup Photos" (gear
--- setup photos, sometimes further split by year inside Drive itself; that
--- year layer isn't modeled here, this just links to the parent folder) and
--- "Reference Photos" (photos from previous Picture Days at that school).
--- Both nullable, both owner-editable only, from the Saved Schools panel
--- (SchoolsPanel.tsx) — same "own row" pattern as staff_notes above. Shown
--- to staff on the mobile Team view (/team), same as staff_notes.
---
--- On RLS: no new policy needed here either, for the exact same reason as
--- staff_notes' own comment above — Postgres RLS filters whole ROWS, not
--- individual columns, and the existing "staff-scoped read own schools"
--- RESTRICTIVE policy below already lets a staff-scoped login SELECT the
--- full row of any school behind a job it's assigned to. A plain new nullable
--- column on that same table is automatically included in that same read.
-alter table schools add column if not exists reference_photos_url text;
-alter table schools add column if not exists setup_photos_url text;
+    alter table schools drop column staff_notes;
+    alter table schools drop column reference_photos_url;
+    alter table schools drop column setup_photos_url;
+  end if;
+end $$;
 
 -- ---------- Staff portal: staff-scoped logins (read-only) ----------
 -- Everything above this point assumed "authenticated" means "an owner"
@@ -1154,11 +1159,10 @@ grant execute on function staff_portal_full_timeline_for_days(uuid[]) to authent
 -- already plain columns on THIS app's own jobs/picture_days tables
 -- (jobs.category/school_type, picture_days.setups/is_outdoor) and need no
 -- new function or policy: Postgres RLS filters whole ROWS, not individual
--- columns (see staff_notes' own comment further up this file for the same
--- point made in detail), and the existing "staff-scoped read own jobs"/
--- "staff-scoped read own picture days" policies above already let a
--- staff-scoped login SELECT the full row of any job/day it's actually
--- assigned to — so those three facts just needed to be added to what
+-- columns, and the existing "staff-scoped read own jobs"/"staff-scoped read
+-- own picture days" policies above already let a staff-scoped login SELECT
+-- the full row of any job/day it's actually assigned to — so those three
+-- facts just needed to be added to what
 -- src/lib/data.ts already selects, nothing here. The two facts below are
 -- different: one is genuinely new ACCESS (not just a wider column list),
 -- and the other lives on a table this app has no grant on at all — each
@@ -1246,11 +1250,18 @@ grant execute on function staff_portal_crew_for_days(uuid[]) to authenticated;
 --
 -- Extended again 2026-09-19: parking_notes is a fourth such tb_jobs column
 -- (onsite/street parking, reserved spots, etc. — added there for the same
--- Pixifi Event Info panel work, see timeline-builder's own schema.sql). This
--- is distinct from this app's own schools.staff_notes (navigation/address
--- confusion — "GPS says X but the real entrance is Y" — see that column's
--- own comment further up this file); both are real, separate staff-only
--- facts and both are shown on /team, just from different tables.
+-- Pixifi Event Info panel work, see timeline-builder's own schema.sql).
+--
+-- Extended once more the same day: location_notes/reference_photos_url/
+-- setup_photos_url are three tb_schools columns (not tb_jobs — these are
+-- school-level facts with no per-job override, see tb_schools.location_
+-- notes' own comment in timeline-builder's schema.sql) that moved here from
+-- this app's OWN schools.staff_notes/reference_photos_url/setup_photos_url
+-- (see the migration further up this file) once Adi asked for school
+-- details to live in one place instead of two. location_notes is the same
+-- navigation/address-confusion fact staff_notes always was ("GPS says X but
+-- the real entrance is Y") — just relocated, not redesigned. All three are
+-- staff-only and shown on /team, same as before the move.
 --
 -- custom_fields is the interesting one — Adi's free-form "extra facts"
 -- list. It is NOT simply tb_jobs.pixifi_custom_fields: timeline-builder
@@ -1289,7 +1300,17 @@ returns table(
   dress_code_note text,
   additional_gear_notes text,
   parking_notes text,
-  custom_fields jsonb
+  custom_fields jsonb,
+  -- Added 2026-09-19 for the schools.staff_notes/reference_photos_url/
+  -- setup_photos_url -> tb_schools move described above. New OUT columns
+  -- appended at the end, same as every earlier extension of this function
+  -- (individual_photo_location/dress_code_note/additional_gear_notes/
+  -- parking_notes) — Postgres allows CREATE OR REPLACE FUNCTION to add
+  -- trailing RETURNS TABLE columns without a drop, as long as no existing
+  -- column is removed, reordered, or retyped.
+  location_notes text,
+  reference_photos_url text,
+  setup_photos_url text
 )
 language plpgsql
 security definer
@@ -1318,6 +1339,9 @@ begin
       tj.school_id,
       tj.pixifi_custom_fields as job_custom_fields,
       ts.pixifi_custom_fields as school_custom_fields,
+      ts.location_notes,
+      ts.reference_photos_url,
+      ts.setup_photos_url,
       case
         when tj.is_graduation then 'Graduation'
         when tj.is_makeup_day then 'MUD'
@@ -1348,7 +1372,10 @@ begin
       when b.school_id is not null and b.field_type is not null
         then coalesce(b.school_custom_fields -> b.field_type, '[]'::jsonb)
       else coalesce(b.job_custom_fields, '[]'::jsonb)
-    end as custom_fields
+    end as custom_fields,
+    nullif(b.location_notes, ''),
+    b.reference_photos_url,
+    b.setup_photos_url
   from base b;
 end;
 $$;
