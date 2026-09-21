@@ -1413,3 +1413,112 @@ end;
 $$;
 
 grant execute on function staff_portal_briefing_for_days(uuid[]) to authenticated;
+
+-- ---------- Custom picture-day types (2026-09-21) ----------
+-- Timeline Builder's School Details page no longer limits a school to
+-- exactly Fall/Spring/Graduation/MUD — real data (St. Francis' "8th Grade
+-- Grad", Head-Royce's "Spring Senior Portraits", etc.) needs each school to
+-- have its own named list. tb_jobs gained a new, purely additive
+-- picture_day_type text column (see timeline-builder's own supabase/
+-- schema.sql for the full reasoning and the tb_schools.picture_day_types/
+-- picture_day_defaults columns it introduces alongside it) — an explicit
+-- per-job tag that, when set, IS the type, same as
+-- pixifiFieldTypeForJob() (timeline-builder's src/lib/pixifiEventInfo.ts)
+-- now checks it first before falling back to the exact is_graduation/
+-- is_makeup_day/date inference this function already had. This is the one
+-- place in THIS app's schema that duplicates that resolution logic (for
+-- custom_fields scoping below), so it needs the identical update or the
+-- staff portal's Details section would silently disagree with Job Details/
+-- School Details about which type's custom fields a job shows — no other
+-- change needed here: pixifi_custom_fields' own storage shape was already
+-- Record<string, ...>, so any custom type name (not just the original four)
+-- already round-trips through school_custom_fields -> field_type correctly
+-- with no shape change at all. No new column on this app's own tables —
+-- picture_day_type lives entirely on tb_jobs, read here the same way
+-- is_graduation/is_makeup_day already are.
+create or replace function staff_portal_briefing_for_days(p_picture_day_ids uuid[])
+returns table(
+  picture_day_id uuid,
+  backdrop text,
+  wifi_network text,
+  wifi_password text,
+  notes text,
+  individual_photo_location text,
+  dress_code_note text,
+  additional_gear_notes text,
+  parking_notes text,
+  custom_fields jsonb,
+  location_notes text,
+  reference_photos_url text,
+  setup_photos_url text
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_staff_id uuid;
+begin
+  select id into v_staff_id from staff where auth_user_id = auth.uid();
+  if v_staff_id is null then
+    return;
+  end if;
+
+  return query
+  with base as (
+    select
+      pd.id as picture_day_id,
+      tj.backdrop,
+      tj.wifi_network,
+      tj.wifi_password,
+      tj.internal_notes,
+      tj.individual_photo_location,
+      tj.dress_code_note,
+      tj.additional_gear_notes,
+      tj.parking_notes,
+      tj.school_id,
+      tj.pixifi_custom_fields as job_custom_fields,
+      ts.pixifi_custom_fields as school_custom_fields,
+      ts.location_notes,
+      ts.reference_photos_url,
+      ts.setup_photos_url,
+      case
+        when tj.picture_day_type is not null then tj.picture_day_type
+        when tj.is_graduation then 'Graduation'
+        when tj.is_makeup_day then 'MUD'
+        when earliest_day.d is null then null
+        when extract(month from earliest_day.d) >= 8 then 'Fall'
+        else 'Spring'
+      end as field_type
+    from picture_days pd
+    join schedule_assignments sa on sa.picture_day_id = pd.id and sa.staff_id = v_staff_id
+    join tb_jobs tj on tj.scheduler_job_id = pd.job_id
+    left join tb_schools ts on ts.id = tj.school_id
+    left join lateral (
+      select min(td.event_date) as d from tb_days td where td.job_id = tj.id
+    ) earliest_day on true
+    where pd.id = any(p_picture_day_ids)
+  )
+  select
+    b.picture_day_id,
+    nullif(b.backdrop, ''),
+    nullif(b.wifi_network, ''),
+    nullif(b.wifi_password, ''),
+    nullif(b.internal_notes, ''),
+    nullif(b.individual_photo_location, ''),
+    nullif(b.dress_code_note, ''),
+    nullif(b.additional_gear_notes, ''),
+    nullif(b.parking_notes, ''),
+    case
+      when b.school_id is not null and b.field_type is not null
+        then coalesce(b.school_custom_fields -> b.field_type, '[]'::jsonb)
+      else coalesce(b.job_custom_fields, '[]'::jsonb)
+    end as custom_fields,
+    nullif(b.location_notes, ''),
+    b.reference_photos_url,
+    b.setup_photos_url
+  from base b;
+end;
+$$;
+
+grant execute on function staff_portal_briefing_for_days(uuid[]) to authenticated;
