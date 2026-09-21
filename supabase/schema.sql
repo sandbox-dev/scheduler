@@ -424,6 +424,27 @@ alter table schedule_assignments add constraint schedule_assignments_role_check
 -- the owner sends an availability request.
 alter table staff add column if not exists pin text not null default lpad(floor(random() * 10000)::text, 4, '0');
 
+-- ---------- Subscribable per-staff calendar feed (ICS) ----------
+-- Stable, NEVER-expiring per-staff secret used only as the URL token for
+-- that person's own subscribable calendar feed
+-- (src/app/api/calendar/[token]/route.ts) — replaces Adi manually
+-- re-entering someone's schedule into Pixifi's own calendar by hand just so
+-- they have something to subscribe to. Deliberately NOT the same mechanism
+-- as availability_links.token (random too, but shared across staff and
+-- expiring after LINK_LIFETIME_DAYS) or staff.pin just above (a 4-digit
+-- shared secret typed in alongside a chosen name — fine to be guessable
+-- inside a few thousand tries since the name pairing is the real gate; not
+-- fine as the ONLY thing standing between a URL and someone's schedule). A
+-- calendar app polls the same URL indefinitely with no re-auth step ever,
+-- so this token has to keep working forever and has to be cryptographically
+-- random on its own — encode(gen_random_bytes(24), 'hex') (pgcrypto,
+-- already enabled above) rather than pin's plain random()-based digits.
+-- The default backfills every existing row with its OWN independently
+-- random value (same as pin's own default above), and covers every new
+-- staff member automatically going forward.
+alter table staff add column if not exists calendar_token text not null unique
+  default encode(gen_random_bytes(24), 'hex');
+
 -- Marks a staff member's availability for a month as submitted-and-locked
 -- via the public link, so they can't go back and change it themselves
 -- (the owner can still override manually from the Availability Tracker).

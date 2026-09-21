@@ -157,6 +157,7 @@ function makeStaff(overrides: Partial<Staff>): Staff {
     active: true,
     mileage_eligible: true,
     pin: "0000",
+    calendar_token: "test-token",
     ...overrides,
   };
 }

@@ -188,7 +188,12 @@ export async function getTimelineBuilderJobIds(schedulerJobIds: string[]): Promi
 // picture_days/jobs/schools those assignments reference, so there's no
 // extra filtering needed here beyond what makes the query useful.
 
-export type StaffPortalAccount = { id: string; name: string };
+// calendar_token is this staff member's own stable feed secret (see
+// src/app/api/calendar/[token]/route.ts) — safe to include here since the
+// staff-scoped RLS policy on `staff` already lets a login read every
+// column of its OWN row (see "staff-scoped read own row" in
+// supabase/schema.sql), same as it already can for e.g. `pin`.
+export type StaffPortalAccount = { id: string; name: string; calendar_token: string };
 
 // The logged-in staff-scoped user's own staff row, or null if this login
 // isn't linked to one (shouldn't normally happen — the proxy only routes a
@@ -203,7 +208,7 @@ export async function getMyStaffAccount(): Promise<StaffPortalAccount | null> {
 
   const { data, error } = await supabase
     .from("staff")
-    .select("id, name")
+    .select("id, name, calendar_token")
     .eq("auth_user_id", user.id)
     .maybeSingle();
   if (error) throw error;

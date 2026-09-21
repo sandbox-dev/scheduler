@@ -100,6 +100,13 @@ export type Staff = {
   active: boolean;
   mileage_eligible: boolean;
   pin: string;
+  // Stable, non-expiring per-staff secret in their subscribable calendar
+  // feed URL (src/app/api/calendar/[token]/route.ts) — same "token in a
+  // URL grants scoped access" shape as availability_links.token, but
+  // permanent rather than expiring, since a calendar subscription has to
+  // keep working indefinitely. Never shown on the owner-facing Staff page;
+  // surfaced only to the staff member themselves on /team.
+  calendar_token: string;
 };
 
 export type Availability = {
