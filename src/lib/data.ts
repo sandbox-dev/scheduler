@@ -104,6 +104,20 @@ export async function getAvailabilitySendLog(month: string): Promise<Availabilit
   return data as AvailabilitySendLogEntry[];
 }
 
+export type ScheduleApprovalSendLogEntry = { sent_at: string; sent_by: string; recipient_names: string[] };
+
+// Most recent first, same reasoning as getAvailabilitySendLog above.
+export async function getScheduleApprovalSendLog(month: string): Promise<ScheduleApprovalSendLogEntry[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("schedule_approval_send_log")
+    .select("sent_at, sent_by, recipient_names")
+    .eq("month", month)
+    .order("sent_at", { ascending: false });
+  if (error) throw error;
+  return data as ScheduleApprovalSendLogEntry[];
+}
+
 export type ScheduleApproval = { month: string; approved_at: string };
 
 export async function getApprovalForMonth(month: string): Promise<ScheduleApproval | null> {
