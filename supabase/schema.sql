@@ -230,6 +230,125 @@ create table if not exists schedule_approvals (
   approved_at timestamptz not null default now()
 );
 
+-- Two one-time flags for the schedule_confirmations chase sequence below —
+-- reset to null on every (re-)approve so a re-send re-arms both for the new
+-- round, same as availability_links.deadline_notice_sent_at resetting on a
+-- fresh send. missing_confirmations_notice_sent_at fires once, ~72h after
+-- approving, telling the studio who still hasn't confirmed (silent if
+-- everyone already has by then). all_confirmed_notice_sent_at fires the
+-- moment the last active staff member confirms, whenever that happens to
+-- land. Adi, 2026-09-21: "72 hours we get a list of who is missing. and
+-- when everyone is confirmed we get an 'everyone confirmed' message."
+alter table schedule_approvals add column if not exists missing_confirmations_notice_sent_at timestamptz;
+alter table schedule_approvals add column if not exists all_confirmed_notice_sent_at timestamptz;
+
+-- One row per (staff, month) once their schedule-approved email has gone
+-- out — tracks whether they've clicked through to confirm they reviewed it,
+-- so Adi doesn't have to individually chase every person down. Adi,
+-- 2026-09-21: "similar to submitting availability, except the due date is
+-- implied, 48 hours." Confirming needs no login (same reasoning as the
+-- PIN-gated availability link — a one-off action shouldn't require setting
+-- up a session), so `token` is the entire access control here; it's
+-- crypto-random like staff.calendar_token, not staff.pin's guessable
+-- digits, and — unlike calendar_token — is only ever generated once per
+-- row and never rotated, so the original email's link and the 48h
+-- reminder's link (same token) both keep working. Re-approving upserts
+-- sent_at/confirmed_at/reminder_sent_at back to a fresh cycle without
+-- touching token, since it's scoped to (staff_id, month) either way.
+create table if not exists schedule_confirmations (
+  id uuid primary key default gen_random_uuid(),
+  staff_id uuid not null references staff(id) on delete cascade,
+  month date not null,
+  token text not null unique default encode(gen_random_bytes(24), 'hex'),
+  sent_at timestamptz not null default now(),
+  confirmed_at timestamptz,
+  reminder_sent_at timestamptz,
+  unique (staff_id, month)
+);
+alter table schedule_confirmations enable row level security;
+drop policy if exists "owners full access" on schedule_confirmations;
+create policy "owners full access" on schedule_confirmations for all to authenticated using (true) with check (true);
+
+-- Read-only lookup for the public /confirm-schedule/[token] page — same
+-- shape as get_availability_form_data: security definer so an anonymous
+-- visitor (no session) can resolve their own token without any table grant,
+-- and returns confirmed_at so the page can show "already confirmed" rather
+-- than re-confirming (and re-checking all_confirmed) on every repeat visit.
+create or replace function get_schedule_confirmation(p_token text)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_row schedule_confirmations%rowtype;
+  v_staff_name text;
+begin
+  select * into v_row from schedule_confirmations where token = p_token;
+  if not found then
+    return json_build_object('error', 'invalid_link');
+  end if;
+
+  select name into v_staff_name from staff where id = v_row.staff_id;
+
+  return json_build_object(
+    'ok', true,
+    'staff_name', v_staff_name,
+    'month', v_row.month,
+    'confirmed_at', v_row.confirmed_at
+  );
+end;
+$$;
+grant execute on function get_schedule_confirmation(text) to anon, authenticated;
+
+-- Marks one staff member's schedule confirmed, idempotently (a repeat click
+-- just returns the same result rather than erroring). Same "compute the
+-- completion flag here, once, on whichever confirm happens to be the last
+-- one in" shape as submit_availability_final's all_submitted — active
+-- staff only, so a departed staff member's stale unconfirmed row can never
+-- permanently block the "everyone confirmed" notice.
+create or replace function confirm_schedule(p_token text)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_row schedule_confirmations%rowtype;
+  v_staff_name text;
+  v_active_count integer;
+  v_confirmed_count integer;
+begin
+  select * into v_row from schedule_confirmations where token = p_token;
+  if not found then
+    return json_build_object('error', 'invalid_link');
+  end if;
+
+  select name into v_staff_name from staff where id = v_row.staff_id;
+
+  if v_row.confirmed_at is null then
+    update schedule_confirmations set confirmed_at = now() where token = p_token;
+  end if;
+
+  select count(*) into v_active_count
+    from schedule_confirmations sc
+    join staff s on s.id = sc.staff_id and s.active
+    where sc.month = v_row.month;
+  select count(*) into v_confirmed_count
+    from schedule_confirmations sc
+    join staff s on s.id = sc.staff_id and s.active
+    where sc.month = v_row.month and sc.confirmed_at is not null;
+
+  return json_build_object(
+    'ok', true,
+    'staff_name', v_staff_name,
+    'month', v_row.month,
+    'all_confirmed', v_active_count > 0 and v_confirmed_count >= v_active_count
+  );
+end;
+$$;
+grant execute on function confirm_schedule(text) to anon, authenticated;
+
 -- One row per "Approve schedule" / "Re-approve & notify" click — same reason
 -- and shape as availability_send_log below: Adi, Julia, and Steph all share
 -- full owner access with no other way to tell whether someone already sent
@@ -1033,6 +1152,12 @@ create policy "staff-scoped no access" on schedule_approvals as restrictive
 
 drop policy if exists "staff-scoped no access" on schedule_approval_send_log;
 create policy "staff-scoped no access" on schedule_approval_send_log as restrictive
+  for all to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no access" on schedule_confirmations;
+create policy "staff-scoped no access" on schedule_confirmations as restrictive
   for all to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());

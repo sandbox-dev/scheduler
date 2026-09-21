@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  allScheduleConfirmedEmail,
   allSubmittedEmail,
   availabilityReminderEmail,
   availabilityRequestEmail,
   deadlineMissedEmail,
   escapeHtml,
   scheduleApprovedEmail,
+  scheduleConfirmReminderEmail,
+  scheduleConfirmationsMissingEmail,
   staffSubmittedEmail,
 } from "./emails";
 
@@ -116,13 +119,50 @@ describe("scheduleApprovedEmail", () => {
         { date: "Tue Sep 8", role: "Photographer", school: "Head-Royce", city: "Oakland" },
         { date: "Wed Sep 9", role: "Assistant", school: "Park Day", city: "" },
       ],
+      confirmLink: "https://scheduler.example.com/confirm-schedule/abc123",
     });
     expect(subject).toBe("Your September 2026 Picture Day schedule");
     expect(htmlBody).toContain("Tue Sep 8");
     expect(htmlBody).toContain("Photographer");
     expect(htmlBody).toContain("Head-Royce");
     expect(htmlBody).toContain("(Oakland)");
+    expect(htmlBody).toContain("https://scheduler.example.com/confirm-schedule/abc123");
     // A school with no address on file shouldn't render an empty "()".
     expect(htmlBody).not.toContain("()");
+  });
+});
+
+describe("scheduleConfirmReminderEmail", () => {
+  it("repeats the schedule inline rather than just linking back to the original email", () => {
+    const { subject, htmlBody } = scheduleConfirmReminderEmail({
+      staffName: "Sarah Chen",
+      monthLabel: "September 2026",
+      days: [{ date: "Tue Sep 8", role: "Photographer", school: "Head-Royce", city: "Oakland" }],
+      confirmLink: "https://scheduler.example.com/confirm-schedule/abc123",
+    });
+    expect(subject).toContain("September 2026");
+    expect(htmlBody).toContain("Tue Sep 8");
+    expect(htmlBody).toContain("Head-Royce");
+    expect(htmlBody).toContain("https://scheduler.example.com/confirm-schedule/abc123");
+  });
+});
+
+describe("scheduleConfirmationsMissingEmail", () => {
+  it("lists everyone still missing", () => {
+    const { subject, htmlBody } = scheduleConfirmationsMissingEmail({
+      monthLabel: "September 2026",
+      missingNames: ["Sarah Chen", "Alex Rivera"],
+    });
+    expect(subject).toContain("2");
+    expect(htmlBody).toContain("Sarah Chen");
+    expect(htmlBody).toContain("Alex Rivera");
+  });
+});
+
+describe("allScheduleConfirmedEmail", () => {
+  it("names the month", () => {
+    const { subject, htmlBody } = allScheduleConfirmedEmail({ monthLabel: "September 2026" });
+    expect(subject).toContain("September 2026");
+    expect(htmlBody).toContain("September 2026");
   });
 });
