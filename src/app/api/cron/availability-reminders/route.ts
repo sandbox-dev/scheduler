@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { monthLabel } from "@/lib/month";
 import { sendGmailMessage } from "@/lib/gmail";
-import { availabilityReminderEmail, deadlineMissedEmail } from "@/lib/emails";
+import {
+  availabilityReminderEmail,
+  deadlineMissedEmail,
+  scheduleConfirmReminderEmail,
+  scheduleConfirmationsMissingEmail,
+} from "@/lib/emails";
+import { buildStaffScheduleRows, cityFromAddress, fmtDate, neededDatesSummary } from "@/lib/scheduling";
+import type { JobWithDays, ScheduleAssignment } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof createServiceRoleClient>;
 
@@ -36,13 +43,16 @@ function formatDeadline(deadlineAt: string) {
 }
 
 // Runs on Vercel Cron (see vercel.json, once daily — Vercel's free Hobby
-// plan doesn't allow finer-grained schedules). Two independent jobs share
-// this one route since they run on the same schedule and both key off
-// availability_links.deadline_at:
-//   1. Remind any active staff member who hasn't submitted yet, once their
-//      month's deadline is within about a day.
-//   2. Once a deadline has actually passed, tell the studio if anyone's
-//      still missing (silent if everyone got their availability in).
+// plan doesn't allow finer-grained schedules). Four independent jobs share
+// this one route since they all run on the same daily schedule:
+//   1. Remind any active staff member who hasn't submitted availability
+//      yet, once their month's deadline is within about a day.
+//   2. Once an availability deadline has actually passed, tell the studio
+//      if anyone's still missing (silent if everyone got it in).
+//   3. Remind any staff member who hasn't confirmed they reviewed their
+//      approved schedule yet, once ~48h have passed since it was sent.
+//   4. Once ~72h have passed since a schedule was approved, tell the studio
+//      who still hasn't confirmed (silent if everyone already has).
 // No logged-in session exists for a cron trigger, so this uses the
 // service-role client the same way the Zapier import webhook does
 // (src/app/api/webhooks/zapier/jobs/route.ts).
@@ -141,11 +151,154 @@ export async function GET(request: NextRequest) {
       .eq("token", link.token);
   }
 
+  // ---------- Job 3: remind staff who haven't confirmed their schedule ----------
+  let confirmRemindersSent = 0;
+  const confirmRemindersFailed: string[] = [];
+  const confirmReminderCutoff = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+
+  const { data: dueConfirmations, error: dueConfirmError } = await supabase
+    .from("schedule_confirmations")
+    .select("token, month, staff_id")
+    .lte("sent_at", confirmReminderCutoff.toISOString())
+    .is("confirmed_at", null)
+    .is("reminder_sent_at", null);
+
+  if (dueConfirmError) {
+    return NextResponse.json({ error: "Couldn't load due schedule confirmations" }, { status: 500 });
+  }
+
+  // Grouped by month so each month's schedule rows are only rebuilt once,
+  // even if several staff members are due a reminder for the same month.
+  const monthsNeeded = [...new Set((dueConfirmations ?? []).map((c) => c.month as string))];
+  const rowsByMonth = new Map<string, Awaited<ReturnType<typeof buildScheduleRowsForMonth>>>();
+  for (const m of monthsNeeded) {
+    rowsByMonth.set(m, await buildScheduleRowsForMonth(supabase, m));
+  }
+
+  // Active only — an inactive/departed staff member should never get a
+  // reminder, and their stale unconfirmed row (if any) shouldn't show up
+  // in the studio's "still missing" list either, matching the active-only
+  // definition confirm_schedule's own all_confirmed check already uses.
+  const { data: activeStaffForConfirm } = await supabase.from("staff").select("id, name, email").eq("active", true);
+  const staffById = new Map((activeStaffForConfirm ?? []).map((s) => [s.id as string, s]));
+
+  for (const c of dueConfirmations ?? []) {
+    const s = staffById.get(c.staff_id as string);
+    const rows = rowsByMonth.get(c.month as string)?.get(c.staff_id as string) ?? [];
+    if (s?.email?.trim() && rows.length > 0) {
+      const { subject, htmlBody } = scheduleConfirmReminderEmail({
+        staffName: s.name,
+        monthLabel: monthLabel(c.month as string),
+        days: rows,
+        confirmLink: `${siteUrl}/confirm-schedule/${c.token}`,
+      });
+      const result = await sendGmailMessage({ to: s.email, subject, htmlBody });
+      if (result.ok) confirmRemindersSent++;
+      else confirmRemindersFailed.push(s.name);
+    }
+
+    // Marked regardless of send outcome, same reasoning as Job 1 — a
+    // once-daily job shouldn't re-remind everyone who already got theirs
+    // just because one person's send failed.
+    await supabase
+      .from("schedule_confirmations")
+      .update({ reminder_sent_at: new Date().toISOString() })
+      .eq("token", c.token);
+  }
+
+  // ---------- Job 4: tell the studio who's still missing, 72h after approving ----------
+  let missingNoticesSent = 0;
+  const confirmMissingCutoff = new Date(now.getTime() - 72 * 60 * 60 * 1000);
+
+  const { data: duePayApprovals, error: dueApprovalError } = await supabase
+    .from("schedule_approvals")
+    .select("month, approved_at")
+    .lte("approved_at", confirmMissingCutoff.toISOString())
+    .is("missing_confirmations_notice_sent_at", null);
+
+  if (dueApprovalError) {
+    return NextResponse.json({ error: "Couldn't load due schedule approvals" }, { status: 500 });
+  }
+
+  for (const approval of duePayApprovals ?? []) {
+    const { data: confirmations } = await supabase
+      .from("schedule_confirmations")
+      .select("staff_id, confirmed_at")
+      .eq("month", approval.month);
+
+    const missingIds = (confirmations ?? []).filter((c) => !c.confirmed_at).map((c) => c.staff_id as string);
+    const missingActiveNames = missingIds
+      .map((id) => staffById.get(id))
+      .filter((s): s is { id: string; name: string; email: string } => Boolean(s));
+
+    if (missingActiveNames.length > 0) {
+      const { subject, htmlBody } = scheduleConfirmationsMissingEmail({
+        monthLabel: monthLabel(approval.month as string),
+        missingNames: missingActiveNames.map((s) => s.name),
+      });
+      const result = await sendGmailMessage({ to: STUDIO_EMAIL, subject, htmlBody });
+      if (result.ok) missingNoticesSent++;
+    }
+
+    // Marked regardless of whether anyone was missing — this notice only
+    // ever fires once per approval, same as deadline_notice_sent_at above.
+    await supabase
+      .from("schedule_approvals")
+      .update({ missing_confirmations_notice_sent_at: new Date().toISOString() })
+      .eq("month", approval.month);
+  }
+
   return NextResponse.json({
     upcomingLinksProcessed: upcomingLinks?.length ?? 0,
     remindersSent,
     remindersFailed,
     passedLinksProcessed: passedLinks?.length ?? 0,
     deadlineNoticesSent,
+    dueConfirmationsProcessed: dueConfirmations?.length ?? 0,
+    confirmRemindersSent,
+    confirmRemindersFailed,
+    dueApprovalsProcessed: duePayApprovals?.length ?? 0,
+    missingNoticesSent,
   });
+}
+
+// Rebuilds every active staff member's booked days for `month`, same shape
+// approveSchedule's own send loop builds — needed again here since the 48h
+// reminder repeats the schedule inline rather than just linking back to an
+// email that may already be buried. Fetched fresh each run, never cached,
+// so a schedule edited after approval is reflected in the reminder too.
+async function buildScheduleRowsForMonth(supabase: SupabaseClient, month: string) {
+  const [{ data: jobs }, { data: assignments }, { data: schools }] = await Promise.all([
+    supabase.from("jobs").select("*, picture_days(*)"),
+    supabase.from("schedule_assignments").select("*"),
+    supabase.from("schools").select("*"),
+  ]);
+
+  const jobsWithDays = (jobs as JobWithDays[] | null ?? []).map((j) => ({
+    ...j,
+    picture_days: [...j.picture_days].sort((a, b) => a.date.localeCompare(b.date)),
+  }));
+  const typedAssignments = (assignments as ScheduleAssignment[] | null) ?? [];
+
+  const needed = neededDatesSummary(jobsWithDays).filter((n) => n.date.startsWith(month.slice(0, 7)));
+  const assignmentsByDay = new Map<string, ScheduleAssignment[]>();
+  typedAssignments.forEach((a) => {
+    const list = assignmentsByDay.get(a.picture_day_id) || [];
+    list.push(a);
+    assignmentsByDay.set(a.picture_day_id, list);
+  });
+  const schoolAddressById = new Map((schools ?? []).map((s) => [s.id as string, s.address as string]));
+  const rowsByStaffId = buildStaffScheduleRows(needed, assignmentsByDay, schoolAddressById);
+
+  const formatted = new Map<string, { date: string; role: string; school: string; city: string }[]>();
+  for (const [staffId, rows] of rowsByStaffId) {
+    formatted.set(
+      staffId,
+      rows.map((r) => {
+        const { wd, md } = fmtDate(r.date);
+        return { date: `${wd} ${md}`, role: r.role, school: r.jobName, city: cityFromAddress(r.address) };
+      })
+    );
+  }
+  return formatted;
 }

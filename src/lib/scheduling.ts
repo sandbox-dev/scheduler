@@ -509,3 +509,14 @@ export function fmtDate(dateStr: string) {
   const md = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return { wd, md };
 }
+
+// Addresses are stored as one free-text line (e.g. "123 Main St, Oakland, CA
+// 94602"); city is the second-to-last comma-separated segment, before the
+// state/zip. Returns "" if the address doesn't have enough parts to tell.
+// Lives here (not in schedule/actions.ts, a "use server" module that can
+// only export async Server Actions) so the schedule-confirmation reminder
+// cron can build the same day rows without duplicating this.
+export function cityFromAddress(address: string): string {
+  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 2] : "";
+}

@@ -142,12 +142,8 @@ export function allSubmittedEmail(e: { monthLabel: string; trackerLink: string }
 
 export type ScheduleDay = { date: string; role: string; school: string; city: string };
 
-export function scheduleApprovedEmail(e: {
-  staffName: string;
-  monthLabel: string;
-  days: ScheduleDay[];
-}): { subject: string; htmlBody: string } {
-  const rows = e.days
+function scheduleDaysTable(days: ScheduleDay[]): string {
+  const rows = days
     .map(
       (d) =>
         `<tr>` +
@@ -157,14 +153,80 @@ export function scheduleApprovedEmail(e: {
         `</tr>`
     )
     .join("");
+  return `<table style="border-collapse:collapse;margin:16px 0;font-size:15px;">${rows}</table>`;
+}
 
+export function scheduleApprovedEmail(e: {
+  staffName: string;
+  monthLabel: string;
+  days: ScheduleDay[];
+  confirmLink: string;
+}): { subject: string; htmlBody: string } {
   return {
     subject: `Your ${e.monthLabel} Picture Day schedule`,
     htmlBody: wrap(
       `<p>Hi ${escapeHtml(firstNameOf(e.staffName))},</p>` +
         `<p>Your <strong>${escapeHtml(e.monthLabel)}</strong> schedule is confirmed. Here's where you're booked:</p>` +
-        `<table style="border-collapse:collapse;margin:16px 0;font-size:15px;">${rows}</table>` +
+        scheduleDaysTable(e.days) +
+        `<p>Please confirm you've reviewed it — takes one click:</p>` +
+        button(e.confirmLink, "CONFIRM I REVIEWED THIS") +
         `<p style="color:${MUTED};font-size:13px;">If anything here doesn't look right, reply to this email and let us know.</p>` +
+        signOff()
+    ),
+  };
+}
+
+// Sent once, ~48h after the original schedule email, only to whoever hasn't
+// confirmed yet — repeats the schedule inline rather than just linking back
+// to the original email, since that one may already be buried. Adi,
+// 2026-09-21: "please confirm you reviewed the schedule, here it is again,
+// with a confirm button."
+export function scheduleConfirmReminderEmail(e: {
+  staffName: string;
+  monthLabel: string;
+  days: ScheduleDay[];
+  confirmLink: string;
+}): { subject: string; htmlBody: string } {
+  return {
+    subject: `Please confirm your ${e.monthLabel} Picture Day schedule`,
+    htmlBody: wrap(
+      `<p>Hi ${escapeHtml(firstNameOf(e.staffName))},</p>` +
+        `<p>Just checking you've seen your <strong>${escapeHtml(e.monthLabel)}</strong> schedule — here it is again:</p>` +
+        scheduleDaysTable(e.days) +
+        `<p>Please confirm you've reviewed it — takes one click:</p>` +
+        button(e.confirmLink, "CONFIRM I REVIEWED THIS") +
+        signOff()
+    ),
+  };
+}
+
+// Studio-facing, ~72h after approving — silent if everyone's already
+// confirmed by then (see the cron route for that check). Adi, 2026-09-21:
+// "72 hours we get a list of who is missing."
+export function scheduleConfirmationsMissingEmail(e: {
+  monthLabel: string;
+  missingNames: string[];
+}): { subject: string; htmlBody: string } {
+  return {
+    subject: `${e.missingNames.length} staff haven't confirmed their ${e.monthLabel} schedule`,
+    htmlBody: wrap(
+      `<p>It's been 72 hours since the <strong>${escapeHtml(e.monthLabel)}</strong> schedule went out.</p>` +
+        `<p>Still waiting on ${e.missingNames.length} ${e.missingNames.length === 1 ? "person" : "people"} to confirm:</p>` +
+        `<ul style="margin:0 0 16px;padding-left:20px;">${e.missingNames.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}</ul>` +
+        signOff()
+    ),
+  };
+}
+
+// Studio-facing — fires the moment the last active staff member confirms,
+// whenever that happens to land (event-driven, not on the 72h cron tick).
+// Adi, 2026-09-21: "when everyone is confirmed we get an 'everyone
+// confirmed' message."
+export function allScheduleConfirmedEmail(e: { monthLabel: string }): { subject: string; htmlBody: string } {
+  return {
+    subject: `Everyone confirmed — ${e.monthLabel} schedule`,
+    htmlBody: wrap(
+      `<p>Every active staff member has confirmed they've reviewed the <strong>${escapeHtml(e.monthLabel)}</strong> schedule. Nothing left to chase.</p>` +
         signOff()
     ),
   };

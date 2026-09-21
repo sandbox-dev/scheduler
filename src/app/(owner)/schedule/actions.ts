@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAvailability, getEquipmentCases, getJobs, getSchools, getScheduleAssignments, getStaff, getStaffSchoolDistances } from "@/lib/data";
-import { assignEquipmentCases, buildStaffScheduleRows, flattenJobDays, fmtDate, generateSchedule, neededDatesSummary, type FlatJobDay, type Schedule, type ScheduleSlot } from "@/lib/scheduling";
+import { assignEquipmentCases, buildStaffScheduleRows, cityFromAddress, flattenJobDays, fmtDate, generateSchedule, neededDatesSummary, type FlatJobDay, type Schedule, type ScheduleSlot } from "@/lib/scheduling";
 import { addDays, monthLabel } from "@/lib/month";
 import { ROLES, type Role, type ScheduleAssignment } from "@/lib/types";
 import { sendGmailMessage } from "@/lib/gmail";
@@ -234,14 +234,6 @@ export async function setAssignmentCase(assignmentId: string, equipmentCase: str
 
 export type ApproveScheduleResult = { emailed: number; skippedNoEmail: string[]; failed: string[]; emailedNames: string[] };
 
-// Addresses are stored as one free-text line (e.g. "123 Main St, Oakland, CA
-// 94602"); city is the second-to-last comma-separated segment, before the
-// state/zip. Returns "" if the address doesn't have enough parts to tell.
-function cityFromAddress(address: string): string {
-  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
-  return parts.length >= 2 ? parts[parts.length - 2] : "";
-}
-
 // Marks the month approved and sends one notification email (via Gmail,
 // see §6b of AGENTS.md) per staff member with assignments that month.
 // Safe to click again after edits; it just re-notifies everyone currently
@@ -251,9 +243,18 @@ function cityFromAddress(address: string): string {
 export async function approveSchedule(month: string): Promise<ApproveScheduleResult> {
   const supabase = await createClient();
 
-  const { error: approvalError } = await supabase
-    .from("schedule_approvals")
-    .upsert({ month, approved_at: new Date().toISOString() }, { onConflict: "month" });
+  // Resets both chase-sequence flags so a re-approve re-arms the 72h
+  // missing-list notice and the all-confirmed notice for this fresh round,
+  // the same way a fresh availability send re-arms deadline_notice_sent_at.
+  const { error: approvalError } = await supabase.from("schedule_approvals").upsert(
+    {
+      month,
+      approved_at: new Date().toISOString(),
+      missing_confirmations_notice_sent_at: null,
+      all_confirmed_notice_sent_at: null,
+    },
+    { onConflict: "month" }
+  );
   if (approvalError) throw new Error("Couldn't mark the schedule approved — please try again.");
 
 
@@ -286,12 +287,30 @@ export async function approveSchedule(month: string): Promise<ApproveScheduleRes
   const skippedNoEmail: string[] = [];
   const failed: string[] = [];
   const emailedNames: string[] = [];
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   for (const s of staff) {
     const rows = rowsByStaffId.get(s.id) || [];
     if (rows.length === 0) continue;
     if (!s.email.trim()) {
       skippedNoEmail.push(s.name);
+      continue;
+    }
+
+    // Resets this person's confirmation cycle for the fresh send — token is
+    // deliberately left out of the payload so an existing row keeps its
+    // original token (see the schema comment on schedule_confirmations for
+    // why: the same link needs to keep working across the 48h reminder).
+    const { data: confirmation, error: confirmError } = await supabase
+      .from("schedule_confirmations")
+      .upsert(
+        { staff_id: s.id, month, sent_at: new Date().toISOString(), confirmed_at: null, reminder_sent_at: null },
+        { onConflict: "staff_id,month" }
+      )
+      .select("token")
+      .single();
+    if (confirmError || !confirmation) {
+      failed.push(s.name);
       continue;
     }
 
@@ -302,6 +321,7 @@ export async function approveSchedule(month: string): Promise<ApproveScheduleRes
         const { wd, md } = fmtDate(r.date);
         return { date: `${wd} ${md}`, role: r.role, school: r.jobName, city: cityFromAddress(r.address) };
       }),
+      confirmLink: `${siteUrl}/confirm-schedule/${confirmation.token}`,
     });
     const result = await sendGmailMessage({ to: s.email, subject, htmlBody });
     if (result.ok) emailedNames.push(s.name);
