@@ -173,6 +173,14 @@ Leave it unset to skip this — the button will show "no feed configured, nothin
 
 The crew rule, mileage rate, and studio address are defined once in [`src/lib/types.ts`](src/lib/types.ts) if they ever need to change.
 
+## Staff portal — a real login for staff, separate from yours
+
+Staff can sign in at `/team/login` (a different login from the owner one) and see just their own upcoming Picture Days: school, address, arrival/start/end time, their crew for the day, and the same day-of details (backdrop, wifi, parking notes, etc.) that used to only live in Pixifi's copy-pasted event notes. It's genuinely scoped at the database level — a staff login can only ever read its own data, enforced the same way owner-only data already is, not just hidden in the UI.
+
+**Calendar feed**: each staff member also gets their own personal, subscribable calendar link (shown on `/team` itself) — subscribe once in Apple/Google Calendar and their real schedule shows up automatically from then on, no re-adding them to Pixifi's calendar by hand after every scheduling change. Real times when a timeline's been sent/approved, otherwise an honest all-day placeholder rather than a guessed time.
+
+**Rollout status**: internal testing only (Adi + Julia), not handed to real staff yet — see project memory for the current status before assuming this is fully rolled out.
+
 ## Not built in v1 (by design)
 
 - Sending the availability link automatically via text/email (you send it manually for now).
