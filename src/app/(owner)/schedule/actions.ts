@@ -232,7 +232,7 @@ export async function setAssignmentCase(assignmentId: string, equipmentCase: str
   revalidatePath("/schedule");
 }
 
-export type ApproveScheduleResult = { emailed: number; skippedNoEmail: string[]; failed: string[] };
+export type ApproveScheduleResult = { emailed: number; skippedNoEmail: string[]; failed: string[]; emailedNames: string[] };
 
 // Addresses are stored as one free-text line (e.g. "123 Main St, Oakland, CA
 // 94602"); city is the second-to-last comma-separated segment, before the
@@ -242,10 +242,12 @@ function cityFromAddress(address: string): string {
   return parts.length >= 2 ? parts[parts.length - 2] : "";
 }
 
-// Marks the month approved and — if a Zapier webhook is configured — sends
-// one notification per staff member with assignments that month, so Zapier
-// can email them their confirmed dates. Safe to click again after edits;
-// it just re-notifies everyone currently assigned.
+// Marks the month approved and sends one notification email (via Gmail,
+// see §6b of AGENTS.md) per staff member with assignments that month.
+// Safe to click again after edits; it just re-notifies everyone currently
+// assigned. Every real send is also appended to schedule_approval_send_log
+// (Adi, 2026-09-21), same reasoning as availability_send_log — so a second
+// owner login can see this month's notification already went out.
 export async function approveSchedule(month: string): Promise<ApproveScheduleResult> {
   const supabase = await createClient();
 
@@ -283,7 +285,7 @@ export async function approveSchedule(month: string): Promise<ApproveScheduleRes
 
   const skippedNoEmail: string[] = [];
   const failed: string[] = [];
-  let emailed = 0;
+  const emailedNames: string[] = [];
 
   for (const s of staff) {
     const rows = rowsByStaffId.get(s.id) || [];
@@ -302,11 +304,24 @@ export async function approveSchedule(month: string): Promise<ApproveScheduleRes
       }),
     });
     const result = await sendGmailMessage({ to: s.email, subject, htmlBody });
-    if (result.ok) emailed++;
+    if (result.ok) emailedNames.push(s.name);
     else failed.push(s.name);
+  }
+
+  // Only records who actually received one, same as availability_send_log —
+  // the log stays evidence of real emails, not of attempts.
+  if (emailedNames.length > 0) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    await supabase.from("schedule_approval_send_log").insert({
+      month,
+      sent_by: user?.email || "unknown",
+      recipient_names: emailedNames,
+    });
   }
 
   revalidatePath("/schedule");
   revalidatePath("/jobs");
-  return { emailed, skippedNoEmail, failed };
+  return { emailed: emailedNames.length, skippedNoEmail, failed, emailedNames };
 }

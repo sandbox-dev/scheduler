@@ -5,6 +5,7 @@ import {
   getAvailability,
   getEquipmentCases,
   getJobs,
+  getScheduleApprovalSendLog,
   getScheduleAssignments,
   getStaff,
   getStaffSchoolDistances,
@@ -71,9 +72,10 @@ export default async function SchedulePage({
   const defaultWeekStart = mondayOf(needed[0]?.date || month);
   const weekStart = sp.week && /^\d{4}-\d{2}-\d{2}$/.test(sp.week) ? sp.week : defaultWeekStart;
 
-  const [approval, timelineBuilderJobIds] = await Promise.all([
+  const [approval, timelineBuilderJobIds, scheduleApprovalSendLog] = await Promise.all([
     getApprovalForMonth(month),
     getTimelineBuilderJobIds(jobs.map((j) => j.id)),
+    getScheduleApprovalSendLog(month),
   ]);
 
   const hasSchedule = assignments.length > 0;
@@ -219,7 +221,12 @@ export default async function SchedulePage({
               <Stat label="Slots filled" value={`${filled} / ${total}`} />
               <Stat label="Unfilled slots" value={total - filled} />
             </div>
-            <ApproveButton month={month} approvedAt={approval?.approved_at || null} />
+            <ApproveButton
+              month={month}
+              approvedAt={approval?.approved_at || null}
+              targetNames={staffWithAssignments.map((s) => s.name)}
+              sendLog={scheduleApprovalSendLog}
+            />
           </div>
         </Card>
       )}

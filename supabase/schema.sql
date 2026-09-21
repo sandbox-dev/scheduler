@@ -222,12 +222,30 @@ create table if not exists availability_notes (
 );
 
 -- Marks a month's schedule as approved/final. Approving triggers one email
--- notification per staff member (via a Zapier webhook) with their confirmed
--- dates — see the "Approve schedule" action on the Schedule page.
+-- notification per staff member (sent directly via Gmail, see §6b of
+-- AGENTS.md — no Zapier webhook involved) with their confirmed dates —
+-- see the "Approve schedule" action on the Schedule page.
 create table if not exists schedule_approvals (
   month date primary key,
   approved_at timestamptz not null default now()
 );
+
+-- One row per "Approve schedule" / "Re-approve & notify" click — same reason
+-- and shape as availability_send_log below: Adi, Julia, and Steph all share
+-- full owner access with no other way to tell whether someone already sent
+-- this month's staff notification before sending it again. Adi, 2026-09-21:
+-- "let's add a confirm button and tracking" for this send, matching the
+-- guard already built for the availability-request send.
+create table if not exists schedule_approval_send_log (
+  id uuid primary key default gen_random_uuid(),
+  month date not null,
+  sent_at timestamptz not null default now(),
+  sent_by text not null default '',
+  recipient_names text[] not null default '{}'
+);
+alter table schedule_approval_send_log enable row level security;
+drop policy if exists "owners full access" on schedule_approval_send_log;
+create policy "owners full access" on schedule_approval_send_log for all to authenticated using (true) with check (true);
 
 -- ---------- Row Level Security ----------
 -- Owners (Adi & Julia) authenticate via Supabase Auth and get full read/write
@@ -1009,6 +1027,12 @@ create policy "staff-scoped no access" on availability_send_log as restrictive
 
 drop policy if exists "staff-scoped no access" on schedule_approvals;
 create policy "staff-scoped no access" on schedule_approvals as restrictive
+  for all to authenticated
+  using (not is_staff_account())
+  with check (not is_staff_account());
+
+drop policy if exists "staff-scoped no access" on schedule_approval_send_log;
+create policy "staff-scoped no access" on schedule_approval_send_log as restrictive
   for all to authenticated
   using (not is_staff_account())
   with check (not is_staff_account());
