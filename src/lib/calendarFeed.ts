@@ -35,7 +35,7 @@ export function buildCalendarEventsForStaff(days: CalendarFeedDay[], staffId: st
     const roleLabel = sortedRoleLabel(day.roles);
     const summary = roleLabel ? `${title} — ${roleLabel}` : title;
 
-    const description = [`Role: ${roleLabel || "—"}`, `Full crew, timeline & notes: ${siteUrl}/team`].join("\n");
+    const description = [`Role: ${roleLabel || "—"}`, `For event details, click: ${siteUrl}/team`].join("\n");
 
     const startMinutes = day.timelineFields ? arrivalMinutes(day.timelineFields) : null;
     const endMinutes = day.timelineFields ? timeToMinutes(day.timelineFields.end_time) : null;
