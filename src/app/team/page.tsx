@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, NotebookPen } from "lucide-react";
+import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, NotebookPen } from "lucide-react";
 import { Card, RoleTag } from "@/components/ui";
+import { CalendarSubscribeLink } from "./CalendarSubscribeLink";
 import {
   getMyAssignments,
   getMyStaffAccount,
@@ -420,6 +421,8 @@ export default async function TeamPage({
     getStaffPortalCrew(pictureDayIds),
   ]);
   const firstName = account.name.split(" ")[0];
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const calendarFeedUrl = `${siteUrl}/api/calendar/${account.calendar_token}.ics`;
 
   return (
     <div style={{ minHeight: "100dvh" }}>
@@ -451,6 +454,22 @@ export default async function TeamPage({
             <ChevronRight size={14} />
           </Link>
         </div>
+
+        {/* Replaces Adi manually re-entering your schedule into Pixifi's own
+            calendar by hand — this feed IS your real, always-current
+            schedule. Collapsed by default (same no-JS <details> pattern as
+            "View Full Timeline" below) since most visits here don't need
+            it — it only has to be set up once. */}
+        <Card style={{ padding: 0 }}>
+          <details className="day-card">
+            <summary className="day-card-summary" style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 700, color: "var(--navy)" }}>
+              <CalendarPlus size={14} /> Subscribe To Your Calendar
+            </summary>
+            <div style={{ padding: "0 18px 16px" }}>
+              <CalendarSubscribeLink httpsUrl={calendarFeedUrl} />
+            </div>
+          </details>
+        </Card>
 
         {assignments.length === 0 ? (
           <Card>
