@@ -493,10 +493,15 @@ export default async function TeamPage({
 
                   <div style={{ padding: "0 22px 20px" }}>
                     {a.school?.address && (
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 2, fontSize: 16, color: "var(--muted)" }}>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.school.address)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 2, fontSize: 16, color: "var(--navy)", textDecoration: "underline" }}
+                      >
                         <MapPin size={13} style={{ marginTop: 1, flexShrink: 0 }} />
                         {a.school.address}
-                      </div>
+                      </a>
                     )}
 
                     {/* Staff-only, tied to the school rather than this one job —
