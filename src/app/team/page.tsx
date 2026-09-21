@@ -438,6 +438,8 @@ export default async function TeamPage({
       </div>
 
       <div style={{ padding: 16, maxWidth: 460, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="display" style={{ fontSize: 17, fontWeight: 700, textAlign: "center" }}>Your Booked Jobs</div>
+
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
           <Link href={`/team?start=${addDays(weekStart, -7)}`} className="btn-secondary" style={{ padding: "7px 10px" }}>
             <ChevronLeft size={14} />
