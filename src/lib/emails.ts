@@ -168,7 +168,7 @@ export function scheduleApprovedEmail(e: {
       `<p>Hi ${escapeHtml(firstNameOf(e.staffName))},</p>` +
         `<p>Your <strong>${escapeHtml(e.monthLabel)}</strong> schedule is confirmed. Here's where you're booked:</p>` +
         scheduleDaysTable(e.days) +
-        `<p style="color:${MUTED};font-size:13px;">By clicking below I confirm that I have reviewed the schedule above.</p>` +
+        `<p style="color:${MUTED};font-size:13px;">By clicking below I confirm that I have reviewed and accept the schedule above.</p>` +
         button(e.confirmLink, "CONFIRM") +
         `<p style="color:${MUTED};font-size:13px;">If anything here doesn't look right, reply to this email and let us know.</p>` +
         signOff()
@@ -193,7 +193,7 @@ export function scheduleConfirmReminderEmail(e: {
       `<p>Hi ${escapeHtml(firstNameOf(e.staffName))},</p>` +
         `<p>Just checking you've seen your <strong>${escapeHtml(e.monthLabel)}</strong> schedule — here it is again:</p>` +
         scheduleDaysTable(e.days) +
-        `<p style="color:${MUTED};font-size:13px;">By clicking below I confirm that I have reviewed the schedule above.</p>` +
+        `<p style="color:${MUTED};font-size:13px;">By clicking below I confirm that I have reviewed and accept the schedule above.</p>` +
         button(e.confirmLink, "CONFIRM") +
         signOff()
     ),

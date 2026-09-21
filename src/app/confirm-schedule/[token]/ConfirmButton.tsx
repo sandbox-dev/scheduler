@@ -37,7 +37,7 @@ export function ConfirmButton({ token, staffName, monthLabel }: { token: string;
     <div>
       <p style={{ fontSize: 14, marginBottom: 14 }}>Hi {staffName},</p>
       <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 14 }}>
-        By clicking here I confirm that I have reviewed my <strong>{monthLabel}</strong> schedule in the email you were sent.
+        By clicking here I confirm that I have reviewed and accept my <strong>{monthLabel}</strong> schedule in the email you were sent.
       </p>
       <button className="btn-primary" disabled={pending} onClick={handleClick}>
         {pending ? "Confirming…" : "Confirm"}
