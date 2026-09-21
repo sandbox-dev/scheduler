@@ -5,10 +5,16 @@ import { NextResponse, type NextRequest } from "next/server";
 // authenticate themselves via a shared secret (ZAPIER_WEBHOOK_SECRET /
 // CRON_SECRET), since external triggers like Zapier and Vercel Cron have no
 // logged-in session for this middleware to check. /team/login is the staff
-// portal's own sign-in page, same idea as /login for owners.
-const PUBLIC_PATHS = ["/login", "/team/login", "/availability", "/auth", "/api/webhooks", "/api/cron"];
+// portal's own sign-in page, same idea as /login for owners. /api/calendar
+// is the same shape as /api/webhooks — a calendar app polls that URL on its
+// own schedule with no logged-in session at all, authenticating instead via
+// the unguessable staff.calendar_token baked into the URL itself (see
+// AGENTS.md §22) — without this, every poll would 307 to /login instead of
+// ever reaching the feed (caught only by hitting the route for real after
+// deploying; nothing in the test suite exercises this proxy).
+const PUBLIC_PATHS = ["/login", "/team/login", "/availability", "/auth", "/api/webhooks", "/api/cron", "/api/calendar"];
 
-function isPublicPath(pathname: string) {
+export function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
