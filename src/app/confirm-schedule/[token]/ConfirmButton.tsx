@@ -35,11 +35,12 @@ export function ConfirmButton({ token, staffName, monthLabel }: { token: string;
 
   return (
     <div>
-      <p style={{ fontSize: 14, marginBottom: 14 }}>
-        Hi {staffName}, please confirm you&#39;ve reviewed your <strong>{monthLabel}</strong> schedule.
+      <p style={{ fontSize: 14, marginBottom: 14 }}>Hi {staffName},</p>
+      <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 14 }}>
+        By clicking here I confirm that I have reviewed and accept my <strong>{monthLabel}</strong> schedule.
       </p>
       <button className="btn-primary" disabled={pending} onClick={handleClick}>
-        {pending ? "Confirming…" : "Confirm I reviewed this"}
+        {pending ? "Confirming…" : "Confirm"}
       </button>
       {error && <div style={{ fontSize: 12.5, color: "var(--bad)", fontWeight: 600, marginTop: 8 }}>{error}</div>}
     </div>
