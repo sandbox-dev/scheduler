@@ -111,9 +111,12 @@ Both come from the same Google Cloud OAuth client the timeline app uses (Google 
 | Deadline missed | the studio | automatically, once a deadline passes with people still outstanding |
 | Someone submitted | the studio | a staff member submitting through their link |
 | Everyone's submitted | the studio | the last active staff member submitting |
-| Schedule confirmed | each assigned staff member | **Approve schedule** on the Schedule page |
+| Schedule confirmed | each assigned staff member, with a confirm link | **Approve schedule** / **Re-approve & notify** on the Schedule page |
+| Confirm your schedule (reminder) | staff who haven't confirmed yet | automatically, ~48h after the schedule email went out |
+| Schedule confirmations missing | the studio | automatically, ~72h after approving, if anyone's still unconfirmed |
+| Everyone confirmed | the studio | the moment the last person clicks the confirm link |
 
-The wording of all seven lives in `src/lib/emails.ts` and is unit tested — what a staff member receives is what's in that file.
+The wording of all ten lives in `src/lib/emails.ts` and is unit tested — what a staff member receives is what's in that file.
 
 ### Why not Zapier
 
@@ -136,6 +139,18 @@ This runs on a schedule rather than off a button, so it needs two things set up 
 The emails themselves are sent by the app through your Gmail — there's no Zap involved.
 
 Test it without waiting a day by setting a link's deadline to ~12 hours out and calling the route directly with the `Authorization: Bearer <CRON_SECRET>` header. The response tells you how many reminders went out and names anyone Gmail refused.
+
+## Staff confirming they've seen their approved schedule
+
+Every schedule-confirmed email includes a **Confirm** button/link — no login needed, same as the availability link. Clicking it takes them to a short page where clicking **Confirm** again is what actually records it (a real second click, not a bare link auto-confirming — an email security scanner pre-fetching links could otherwise mark someone confirmed before they ever saw the message).
+
+From there, the same daily cron that handles availability reminders also runs this chase sequence automatically:
+
+- **~48 hours** after the schedule went out, anyone who hasn't confirmed gets a reminder email with their schedule shown again and another Confirm link.
+- **~72 hours** after you approved, if anyone's still unconfirmed, you get an email naming them. Silent if everyone's already in.
+- The moment the **last** active staff member confirms, you get an "everyone confirmed" email — whenever that happens to land, not on the next cron tick.
+
+Confirmations reset on every re-approve, so re-sending after a schedule change re-arms the whole sequence for everyone, same as the availability reminder resets on a fresh send. Confirmed sends are logged (who was notified, when) right under the Approve button on the Schedule page, same idea as the availability tracker's own send log.
 
 ## Letting someone redo their availability after they've submitted
 
@@ -167,7 +182,7 @@ Leave it unset to skip this — the button will show "no feed configured, nothin
 - **Schedule** — "Generate schedule" auto-assigns every role slot by priority → category/specialty match → distance from the job, respecting who's marked available. Any slot's dropdown shows every qualified person, available or not, grouped accordingly — so a last-minute swap is always possible even if it wasn't planned for. Unfilled slots are flagged rather than left blank.
   - **List** view for editing, **Calendar** view (Month or Week, Monday-start) to see everything at a glance — click a day to jump back to the editable list.
   - **By Staff** view shows each person's assigned dates/roles/schools for the month, with a CSV export.
-  - **Approve schedule** marks the month final and emails each staff member their confirmed dates through your Gmail, reporting who actually received one.
+  - **Approve schedule** marks the month final, asks you to confirm exactly who's about to be emailed, then emails each staff member their confirmed dates through your Gmail with a link for them to confirm they've seen it — reporting who actually received one, and logging the send for a second owner login to see. See "Staff confirming they've seen their approved schedule" above for the automatic chase sequence that follows.
 - **Payroll** — pick a date range and see round-trip miles × $0.75/mile per person, based on who's actually on the finalized schedule. Export as CSV for payroll.
 - **Print weekly sheet** — from the Schedule page, opens a clean, plain page grouped by week for prepping gear, including outdoor/group-photo notes.
 
