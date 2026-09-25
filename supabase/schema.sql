@@ -1671,3 +1671,57 @@ end;
 $$;
 
 grant execute on function staff_portal_briefing_for_days(uuid[]) to authenticated;
+
+-- ===========================================================================
+-- OWNERS LIST — keep this block LAST in the file. (2026-09-25)
+-- ===========================================================================
+-- Every "owners full access" policy above says any logged-in user is an
+-- owner. With school contacts (Timeline Builder's Google sign-in) and team
+-- logins all in this same Supabase project, that stopped being true. Adi,
+-- 2026-09-25, after sign-ups were switched off: only she, Julia and Steph are
+-- owners. So an explicit list, and a restrictive policy on every table here:
+-- an owner, or a team login (which the staff-scoped policies above narrow
+-- further to their own rows). Anyone else logged in sees nothing.
+--
+-- Timeline Builder's schema.sql uses the same is_owner() for its tb_* tables
+-- — this file is where the shared login helpers live (is_staff_account too).
+create table if not exists app_owners (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  note text not null default '',
+  created_at timestamptz not null default now()
+);
+-- No policies: nobody reads or edits this through the API. is_owner() reads
+-- it as security definer, and it's changed only in Supabase's SQL editor.
+alter table app_owners enable row level security;
+
+create or replace function is_owner()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (select 1 from app_owners where user_id = auth.uid());
+$$;
+revoke execute on function is_owner() from public, anon;
+grant execute on function is_owner() to authenticated;
+
+do $$
+declare
+  t text;
+begin
+  -- Every table carrying the "any logged-in user" policy, found rather than
+  -- listed, so a table added later is covered the next time this file runs.
+  -- Timeline Builder's tb_* tables get the same treatment from its own file.
+  for t in
+    select distinct tablename from pg_policies
+     where schemaname = 'public' and policyname = 'owners full access' and tablename not like 'tb\_%'
+  loop
+    execute format('drop policy if exists "owners or team only" on %I', t);
+    execute format(
+      'create policy "owners or team only" on %I as restrictive for all to authenticated using (is_owner() or is_staff_account()) with check (is_owner() or is_staff_account())',
+      t
+    );
+  end loop;
+end;
+$$;

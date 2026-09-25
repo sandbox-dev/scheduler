@@ -20,6 +20,18 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     return { error: "Incorrect email or password." };
   }
 
+  // Only owners (app_owners) and team logins (staff.auth_user_id) have any
+  // access — see the OWNERS LIST block at the end of schema.sql. Anyone else
+  // (a school contact's login, say) would just see an empty app.
+  // Only turns someone away on a clear "no" from both — the database's own
+  // policies are the real lock, so a lookup that errors doesn't lock an owner
+  // out of the sign-in page over a message.
+  const [owner, staff] = await Promise.all([supabase.rpc("is_owner"), supabase.rpc("is_staff_account")]);
+  if (!owner.error && !staff.error && owner.data !== true && staff.data !== true) {
+    await supabase.auth.signOut();
+    return { error: "This login doesn't have access. Please check with Sandbox Photographers." };
+  }
+
   redirect("/overview");
 }
 
