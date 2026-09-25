@@ -1,17 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  monthLabel,
-  shiftMonth,
-  addDays,
-  getMonthsWithDates,
-  pickDefaultMonth,
-  selectableMonths,
-  mondayOf,
-  shiftWeek,
-  getWeekGrid,
-  getMonthGrid,
-  computeJobLanes,
-} from "./month";
+import { monthLabel, shiftMonth, addDays, getMonthsWithDates, pickDefaultMonth, selectableMonths, mondayOf, shiftWeek, getWeekGrid, getMonthGrid, computeJobLanes, todayPacific } from "./month";
 
 describe("shiftMonth", () => {
   it("moves forward across a year boundary", () => {
@@ -160,5 +148,20 @@ describe("monthLabel", () => {
   it("formats a YYYY-MM-01 string as a human month/year", () => {
     expect(monthLabel("2026-09-01")).toMatch(/September/);
     expect(monthLabel("2026-09-01")).toMatch(/2026/);
+  });
+});
+
+describe("team app week (Monday–Sunday, California date)", () => {
+  it("snaps any day to its Monday — including Sunday, which belongs to the week before", () => {
+    expect(mondayOf("2026-09-24")).toBe("2026-09-21"); // Thursday
+    expect(mondayOf("2026-09-21")).toBe("2026-09-21"); // Monday
+    expect(mondayOf("2026-09-27")).toBe("2026-09-21"); // Sunday
+    expect(addDays(mondayOf("2026-09-24"), 6)).toBe("2026-09-27");
+  });
+
+  it("todayPacific is still Sunday on a Sunday evening in California, when UTC is already Monday", () => {
+    // Sun Sep 27 2026, 8pm PDT = Mon Sep 28, 03:00 UTC
+    expect(todayPacific(new Date("2026-09-28T03:00:00Z"))).toBe("2026-09-27");
+    expect(mondayOf(todayPacific(new Date("2026-09-28T03:00:00Z")))).toBe("2026-09-21");
   });
 });

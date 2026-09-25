@@ -12,7 +12,7 @@ import {
   getStaffPortalTimelineTimes,
   type StaffPortalAssignment,
 } from "@/lib/data";
-import { addDays, todayStr } from "@/lib/month";
+import { addDays, mondayOf, todayPacific } from "@/lib/month";
 import { fmtDate } from "@/lib/scheduling";
 import {
   computeStaffPortalDayTimes,
@@ -403,14 +403,12 @@ export default async function TeamPage({
   }
 
   const sp = await searchParams;
-  const today = todayStr();
-  // Rolling 7-day window anchored on ?start= (a plain date, not a
-  // Monday-aligned calendar week — matches how this view always worked
-  // before nav existed: "today through the next 7 days"). Same query-param
-  // navigation convention as the owner-side Schedule page's own Week view
-  // (schedule/page.tsx's `week`/shiftWeek), just a straight ±7-day shift
-  // here since there's no calendar-week alignment to preserve.
-  const weekStart = sp.start && /^\d{4}-\d{2}-\d{2}$/.test(sp.start) ? sp.start : today;
+  const today = todayPacific();
+  // A calendar week, Monday–Sunday — Adi, 2026-09-25: "A week should be
+  // Monday-Sunday date-wise." It used to be a rolling 7 days from today
+  // (e.g. Wednesday–Tuesday). Any ?start= is snapped to its Monday too, so
+  // an old bookmarked link still lands on a proper week.
+  const weekStart = mondayOf(sp.start && /^\d{4}-\d{2}-\d{2}$/.test(sp.start) ? sp.start : today);
   const weekEnd = addDays(weekStart, 6);
   const assignments = await getMyAssignments(account.id, weekStart, weekEnd);
   const pictureDayIds = assignments.map((a) => a.picture_day.id);
@@ -488,11 +486,11 @@ export default async function TeamPage({
                     school at a glance) — a plain <details> so this needs no
                     client state, same no-JS-collapse approach already used
                     for the nested "View Full Timeline" section below.
-                    Assignments are sorted ascending by date and the default
-                    window starts at today (see weekStart above), so today's
-                    card — or the next upcoming one if nothing's scheduled
-                    today — is always first here with no scrolling needed;
-                    it still opens collapsed like every other card. */}
+                    Assignments are sorted ascending by date across the
+                    Monday–Sunday week (see weekStart above); today's card
+                    carries the "Today" label so it stands out among the
+                    week's earlier days. It still opens collapsed like every
+                    other card. */}
                 <details className="day-card">
                   <summary className="day-card-summary" style={{ padding: "20px 22px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
