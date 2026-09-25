@@ -33,7 +33,10 @@ html, body { background: var(--bg); color: var(--ink); font-family: 'Inter', san
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 20px 22px; box-shadow: 0 1px 2px rgba(32,35,43,0.04); }
 
 .top-bar { background: var(--surface); border-bottom: 1px solid var(--line); padding: 18px 24px 0 24px; position: sticky; top: 0; z-index: 10; }
-.brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+/* Same 3-column shape as Timeline Builder's own .brand-row (Adi, 2026-09-24:
+   match font/color/placement between the two apps) — logo left, title
+   centered on its own, account controls right. */
+.brand-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin-bottom: 16px; }
 .tab-bar { display: flex; gap: 4px; flex-wrap: wrap; }
 .tab-pill { border: none; background: transparent; color: var(--muted); padding: 10px 16px; cursor: pointer; font-size: 13.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; border-radius: 10px 10px 0 0; border-bottom: 2px solid transparent; text-decoration: none; }
 .tab-pill.active { color: var(--navy); border-bottom: 2px solid var(--navy); background: rgba(59,91,106,0.08); }
