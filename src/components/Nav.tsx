@@ -20,12 +20,9 @@ export function Nav() {
 
   return (
     <div className="top-bar no-print">
-      <div className="brand-row" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center" }}>
-        <div />
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Image src="/logo.png" alt="Sandbox Photographers" width={70} height={28} style={{ objectFit: "contain" }} priority />
-          <div className="display" style={{ fontSize: 22, fontWeight: 800, color: "var(--ink)" }}>Scheduler</div>
-        </div>
+      <div className="brand-row">
+        <Image src="/logo.png" alt="Sandbox Photographers" width={70} height={28} style={{ objectFit: "contain" }} priority />
+        <div className="display" style={{ fontSize: 22, fontWeight: 800, color: "var(--navy)", textAlign: "center" }}>Scheduler</div>
         <form action={logout} style={{ justifySelf: "end" }}>
           <button className="btn-secondary" type="submit">
             <LogOut size={13} /> Sign out
