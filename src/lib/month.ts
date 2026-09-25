@@ -16,6 +16,14 @@ export function todayStr() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
+// Today's date in California, whatever clock the server runs on. todayStr()
+// reads the server's own clock, which on Vercel is UTC — so from ~5pm
+// Pacific it's already tomorrow. Used where that shows: the team app's
+// Monday–Sunday week would otherwise jump ahead on Sunday evenings.
+export function todayPacific(now: Date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
 export function shiftMonth(month: string, delta: number) {
   const d = new Date(month + "T00:00:00");
   d.setMonth(d.getMonth() + delta);
