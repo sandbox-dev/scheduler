@@ -125,6 +125,9 @@ export function DayRow({ day }: { day: PictureDay }) {
       <td>
         <input
           type="checkbox"
+          // Keyed on the value: ticking Babies on one day sets the whole job,
+          // so the other days' boxes have to redraw when it comes back.
+          key={`babies-${day.is_babies}`}
           defaultChecked={day.is_babies}
           onChange={(e) => startTransition(() => updateDay(day.id, "is_babies", e.target.checked))}
         />

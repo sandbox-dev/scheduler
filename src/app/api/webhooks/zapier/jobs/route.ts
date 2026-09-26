@@ -141,10 +141,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, skipped: "duplicate", job_id: existingJob.id });
     }
 
+    // Babies covers the whole job — a day added later inherits it.
+    const { data: babiesDay } = await supabase.from("picture_days").select("is_babies").eq("job_id", existingJob.id).eq("is_babies", true).limit(1).maybeSingle();
     const { error: daysError } = await supabase.from("picture_days").insert(
       dates.map((date) => ({
         job_id: existingJob.id,
         date,
+        is_babies: !!babiesDay,
         setups,
         is_outdoor: isOutdoor,
         round_trip_miles: roundTripMiles,

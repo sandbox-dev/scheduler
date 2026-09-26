@@ -139,6 +139,12 @@ export async function updateDay(
     .eq("id", dayId)
     .select("job_id")
     .maybeSingle();
+  // Babies covers the whole job, not one day — Adi, 2026-09-25: "babies are
+  // babies for the whole school. not per day", since they may be done on a
+  // make-up day they weren't scheduled for. One tick sets every day.
+  if (day?.job_id && field === "is_babies") {
+    await supabase.from("picture_days").update({ is_babies: value, needs_review: false }).eq("job_id", day.job_id);
+  }
   // Setups and the group photographer are booking facts Timeline Builder
   // follows — catch its job up now.
   if (day?.job_id && (field === "setups" || field === "has_group_photo")) {
