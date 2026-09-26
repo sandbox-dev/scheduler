@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { CATEGORIES, type Category } from "@/lib/types";
+import { syncTimelineBuilderJobs } from "@/lib/timelineBuilderSync";
 
 export type CreateJobState = { error?: string } | undefined;
 
@@ -132,10 +133,17 @@ export async function updateDay(
 ) {
   const supabase = await createClient();
   // Editing any field counts as the owner reviewing this Picture Day.
-  await supabase
+  const { data: day } = await supabase
     .from("picture_days")
     .update({ [field]: value, needs_review: false })
-    .eq("id", dayId);
+    .eq("id", dayId)
+    .select("job_id")
+    .maybeSingle();
+  // Setups and the group photographer are booking facts Timeline Builder
+  // follows — catch its job up now.
+  if (day?.job_id && (field === "setups" || field === "has_group_photo")) {
+    await syncTimelineBuilderJobs(supabase, day.job_id);
+  }
   revalidatePath("/jobs");
   revalidatePath("/overview");
   revalidatePath("/schedule");

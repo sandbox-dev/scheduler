@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { syncTimelineBuilderJobs } from "@/lib/timelineBuilderSync";
 import { CATEGORIES, STUDIO_ADDRESS, type Category } from "@/lib/types";
 import { lookupDistancesToDestination } from "@/lib/googleDistance";
 
@@ -154,6 +155,9 @@ export async function POST(request: NextRequest) {
     if (daysError) {
       return NextResponse.json({ error: "Matched an existing job, but Picture Day failed to save" }, { status: 500 });
     }
+    // Another day for a booking Timeline Builder may already have — it
+    // appears there now, not only once someone opens that job.
+    await syncTimelineBuilderJobs(supabase, existingJob.id);
 
     return NextResponse.json({ ok: true, job_id: existingJob.id, picture_days: dates.length, added_to_existing: true });
   }
