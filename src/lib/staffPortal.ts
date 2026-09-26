@@ -415,7 +415,12 @@ export function sortStaffPortalCrew(crew: StaffPortalCrewMember[]): StaffPortalC
 // Job.school_type's own comment in src/lib/types.ts ("reference only, never
 // used for scheduling"). Falls back to category when school_type hasn't
 // been filled in, so the section never renders blank.
+//
+// A preschool always reads "Preschool" — Adi, 2026-09-25: "Preschool is always
+// preschool, but all the rest should say the actual grades." Same rule as
+// timeline-builder's schoolTypeLabel().
 export function staffPortalSchoolTypeLabel(job: { category: string; school_type: string }): string {
+  if (job.category === "Preschool") return "Preschool";
   return job.school_type.trim() || job.category;
 }
 

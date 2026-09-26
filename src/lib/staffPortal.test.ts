@@ -414,6 +414,10 @@ describe("staffPortalSchoolTypeLabel", () => {
     expect(staffPortalSchoolTypeLabel({ category: "Preschool", school_type: "" })).toBe("Preschool");
   });
 
+  it("a preschool always reads Preschool, whatever grade range was sent", () => {
+    expect(staffPortalSchoolTypeLabel({ category: "Preschool", school_type: "Pre-5" })).toBe("Preschool");
+  });
+
   it("falls back to category when school_type is only whitespace", () => {
     expect(staffPortalSchoolTypeLabel({ category: "K-12", school_type: "   " })).toBe("K-12");
   });
