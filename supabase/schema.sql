@@ -1231,10 +1231,14 @@ begin
   join schedule_assignments sa on sa.picture_day_id = pd.id and sa.staff_id = v_staff_id
   join tb_jobs tj on tj.scheduler_job_id = pd.job_id
   join lateral (
+    -- Approved only — Adi, 2026-09-27: staff "only see approved timelines if
+    -- there's no approved timelines, it shouldn't show any working timelines."
+    -- (Used to take the latest sent OR approved, so a sent-but-unapproved
+    -- draft reached staff.) The latest approval wins.
     select v.snapshot
     from tb_timeline_versions v
-    where v.job_id = tj.id and (v.approved_at is not null or v.reason = 'sent')
-    order by coalesce(v.approved_at, v.created_at) desc
+    where v.job_id = tj.id and v.approved_at is not null
+    order by v.approved_at desc
     limit 1
   ) ver on true
   join lateral (
@@ -1303,10 +1307,14 @@ begin
   join schedule_assignments sa on sa.picture_day_id = pd.id and sa.staff_id = v_staff_id
   join tb_jobs tj on tj.scheduler_job_id = pd.job_id
   join lateral (
+    -- Approved only — Adi, 2026-09-27: staff "only see approved timelines if
+    -- there's no approved timelines, it shouldn't show any working timelines."
+    -- (Used to take the latest sent OR approved, so a sent-but-unapproved
+    -- draft reached staff.) The latest approval wins.
     select v.snapshot
     from tb_timeline_versions v
-    where v.job_id = tj.id and (v.approved_at is not null or v.reason = 'sent')
-    order by coalesce(v.approved_at, v.created_at) desc
+    where v.job_id = tj.id and v.approved_at is not null
+    order by v.approved_at desc
     limit 1
   ) ver on true
   join lateral (

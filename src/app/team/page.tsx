@@ -344,7 +344,7 @@ function FullTimelineSection({
       </summary>
       <div>
         {!fullDay || !timelineFields ? (
-          <div style={{ fontSize: 15, color: "var(--muted)" }}>Timeline not sent yet.</div>
+          <div style={{ fontSize: 15, color: "var(--muted)" }}>Timeline not approved yet.</div>
         ) : (
           <>
             {(() => {
