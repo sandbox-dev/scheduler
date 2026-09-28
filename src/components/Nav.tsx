@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, CalendarDays, Users, CheckCircle2, Award, DollarSign, LogOut } from "lucide-react";
+import { Sparkles, CalendarDays, Users, CheckCircle2, Award, DollarSign, LogOut, Megaphone } from "lucide-react";
 import { logout } from "@/app/login/actions";
 
 const TABS = [
@@ -13,9 +13,10 @@ const TABS = [
   { href: "/availability-tracker", label: "Availability", icon: CheckCircle2 },
   { href: "/schedule", label: "Schedule", icon: Award },
   { href: "/mileage", label: "Payroll", icon: DollarSign },
+  { href: "/whats-new", label: "What's New", icon: Megaphone },
 ];
 
-export function Nav() {
+export function Nav({ unseenUpdates = 0 }: { unseenUpdates?: number }) {
   const pathname = usePathname();
 
   return (
@@ -33,6 +34,11 @@ export function Nav() {
         {TABS.map((t) => (
           <Link key={t.href} href={t.href} className={`tab-pill ${pathname.startsWith(t.href) ? "active" : ""}`}>
             <t.icon size={14} /> {t.label}
+            {t.href === "/whats-new" && unseenUpdates > 0 && (
+              <span style={{ fontSize: 10.5, fontWeight: 800, background: "var(--bad)", color: "#fff", borderRadius: 999, padding: "0 6px", marginLeft: 2 }}>
+                {unseenUpdates}
+              </span>
+            )}
           </Link>
         ))}
       </div>

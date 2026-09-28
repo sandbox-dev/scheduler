@@ -10,7 +10,7 @@ import type { EnrollmentStatus } from "@/lib/data";
 export function EnrollmentStatusChip({ jobId, status }: { jobId: string; status: EnrollmentStatus | undefined }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  if (!status) return null;
+  if (!status || status.skipped) return null;
 
   function set(confirmed: boolean) {
     setError(null);
