@@ -1730,15 +1730,18 @@ alter table jobs add column if not exists enrollment_confirmed_at timestamptz;
 
 -- The ONE rule for a job's enrollment picture, used by the Jobs page (and,
 -- later, the school's confirm page and the emails):
---   number     — the job's own enrollment, else last year's (the same
---                school's most recent earlier booking that had one);
---   from       — 'this_job' | 'last_year' | null (nothing anywhere);
---   capacity   — students the job's setups can take: every day's setups
---                times the per-station number for its category (Timeline
---                Builder's Settings → Enrollment: K-12 150, Preschool 75);
---   roster_count — students on the job's Timeline Builder roster, if any;
---   over       — number or roster count above capacity, and warnings are on.
+--   number, number_from — in order: this job's own enrollment ('this_job');
+--     else this job's Timeline Builder roster count ('roster' — the school's
+--     own list, the best number there is; Adi: "some of these have numbers
+--     from the roster"); else last year's ('last_year' — the same school's
+--     most recent earlier booking: its entered enrollment, else its roster
+--     count); else null.
+--   capacity — every day's setups times the per-station number for the
+--     category (Timeline Builder Settings → Enrollment: K-12 150, Preschool 75);
+--   roster_count — this job's roster, if any;
+--   over — the number or the roster above capacity, and warnings are on.
 -- Security invoker: normal owner rules apply.
+drop function if exists job_enrollment_status(uuid[]);
 create or replace function job_enrollment_status(p_job_ids uuid[])
 returns table (job_id uuid, number integer, number_from text, confirmed boolean, capacity integer, roster_count integer, over boolean)
 language sql
@@ -1757,32 +1760,50 @@ as $$
            (select coalesce(sum(pd.setups), 0) from picture_days pd where pd.job_id = j.id) as station_days
       from jobs j
      where j.id = any(p_job_ids)
+  ),
+  roster as (
+    select tj.scheduler_job_id as sched_job_id, count(*)::integer as n
+      from tb_jobs tj join tb_roster_rows r on r.job_id = tj.id
+     where tj.scheduler_job_id is not null and coalesce(r.role, 'Student') ilike 'student'
+     group by tj.scheduler_job_id
   )
   select b.id,
-         coalesce(b.enrollment, ly.enrollment) as number,
-         case when b.enrollment is not null then 'this_job' when ly.enrollment is not null then 'last_year' end as number_from,
+         coalesce(b.enrollment, rc.n, ly.n) as number,
+         case when b.enrollment is not null then 'this_job'
+              when rc.n is not null then 'roster'
+              when ly.n is not null then 'last_year' end as number_from,
          b.enrollment_confirmed_at is not null as confirmed,
          (b.station_days * case when b.category = 'Preschool' then s.pre else s.k12 end)::integer as capacity,
          rc.n as roster_count,
          s.warn and b.station_days > 0 and (
-           coalesce(b.enrollment, ly.enrollment, 0) > b.station_days * case when b.category = 'Preschool' then s.pre else s.k12 end
+           coalesce(b.enrollment, rc.n, ly.n, 0) > b.station_days * case when b.category = 'Preschool' then s.pre else s.k12 end
            or coalesce(rc.n, 0) > b.station_days * case when b.category = 'Preschool' then s.pre else s.k12 end
          ) as over
     from base b
     cross join (select * from settings union all select 150, 75, true where not exists (select 1 from settings)) s
+    left join roster rc on rc.sched_job_id = b.id
+    -- Last year: the latest earlier booking at the same school, from either
+    -- app — an earlier Scheduler booking (entered number, else its roster), or
+    -- an earlier Timeline Builder job at the linked school (its roster count;
+    -- covers every season from before the Scheduler existed).
     left join lateral (
-      select pj.enrollment
-        from jobs pj
-       where pj.school_id = b.school_id and b.school_id is not null and pj.id <> b.id and pj.enrollment is not null
-         and (select min(pd.date) from picture_days pd where pd.job_id = pj.id) < b.first_day
-       order by (select min(pd.date) from picture_days pd where pd.job_id = pj.id) desc
-       limit 1
-    ) ly on true
-    left join lateral (
-      select nullif(count(*), 0)::integer as n
-        from tb_jobs tj join tb_roster_rows r on r.job_id = tj.id
-       where tj.scheduler_job_id = b.id and coalesce(r.role, 'Student') ilike 'student'
-    ) rc on true;
+      select c.n from (
+        select coalesce(pj.enrollment, pr.n) as n,
+               (select min(pd.date) from picture_days pd where pd.job_id = pj.id) as d
+          from jobs pj
+          left join roster pr on pr.sched_job_id = pj.id
+         where pj.school_id = b.school_id and pj.id <> b.id
+        union all
+        select (select count(*)::integer from tb_roster_rows r where r.job_id = tj.id and coalesce(r.role, 'Student') ilike 'student') as n,
+               (select min(td.event_date) from tb_days td where td.job_id = tj.id) as d
+          from tb_jobs tj
+          join tb_schools ts on ts.id = tj.school_id
+         where ts.scheduler_school_id = b.school_id and tj.scheduler_job_id is distinct from b.id
+      ) c
+      where b.school_id is not null and c.n > 0 and c.d < b.first_day
+      order by c.d desc
+      limit 1
+    ) ly on true;
 $$;
 revoke execute on function job_enrollment_status(uuid[]) from public, anon;
 grant execute on function job_enrollment_status(uuid[]) to authenticated, service_role;
