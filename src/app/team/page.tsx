@@ -171,6 +171,10 @@ function DayBriefingSection({
           <BriefingFact label="Individual Photo Location" value={briefing.individual_photo_location} />
         )}
         {briefing?.backdrop && <BriefingFact label="Backdrop" value={briefing.backdrop} />}
+        {/* School-wide (tb_schools.location_notes, set on School Details).
+            Moved here beside Parking Notes 2026-09-28 — Adi: "so we know
+            its there" (it used to sit alone under the address). */}
+        {briefing?.location_notes && <BriefingFact label="Location Notes" value={briefing.location_notes} />}
         {briefing?.parking_notes && (
           <>
             <BriefingFact label="Parking Notes" value={briefing.parking_notes} />
@@ -536,22 +540,6 @@ export default async function TeamPage({
                         {a.school.address}
                       </a>
                     )}
-
-                    {/* Staff-only, tied to the school rather than this one job —
-                        lives on Timeline Builder's tb_schools.location_notes
-                        now (moved 2026-09-19 from this app's own
-                        schools.staff_notes so a school's details have one
-                        home instead of two — see staff_portal_briefing_for_
-                        days()'s own comment in supabase/schema.sql), read
-                        through the same `briefing` data as every other
-                        Details fact below. Only rendered when an owner has
-                        actually entered something. Plain BriefingFact styling
-                        (Adi: the earlier gold-tinted callout box read as an
-                        "alert" and made an often-empty fact the loudest thing
-                        on the card) — same quiet label-over-text treatment as
-                        Parking Notes/Backdrop/every other Details fact below,
-                        not a special one-off style. */}
-                    {briefing?.location_notes && <BriefingFact label="Location Notes" value={briefing.location_notes} />}
 
                     <div style={{ ...sectionBoxStyle, marginTop: 14 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
