@@ -546,3 +546,31 @@ export async function getPictureDayTypes(jobs: { id: string; school_id: string |
   }
   return { byJob, schoolTypes };
 }
+
+// Each job's enrollment picture from the one shared rule
+// (job_enrollment_status in schema.sql): the number to plan with (this job's,
+// else last year's), whether the school confirmed it, and whether it's more
+// than the setups can take. Fails closed to an empty map.
+export type EnrollmentStatus = {
+  number: number | null;
+  from: "this_job" | "last_year" | null;
+  confirmed: boolean;
+  capacity: number;
+  rosterCount: number | null;
+  over: boolean;
+};
+export async function getEnrollmentStatuses(jobIds: string[]): Promise<Map<string, EnrollmentStatus>> {
+  const out = new Map<string, EnrollmentStatus>();
+  if (jobIds.length === 0) return out;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("job_enrollment_status", { p_job_ids: jobIds });
+    if (error) throw error;
+    for (const r of (data ?? []) as { job_id: string; number: number | null; number_from: EnrollmentStatus["from"]; confirmed: boolean; capacity: number; roster_count: number | null; over: boolean }[]) {
+      out.set(r.job_id, { number: r.number, from: r.number_from, confirmed: r.confirmed, capacity: r.capacity, rosterCount: r.roster_count, over: r.over });
+    }
+  } catch (err) {
+    console.error("getEnrollmentStatuses failed — hiding enrollment status", err);
+  }
+  return out;
+}

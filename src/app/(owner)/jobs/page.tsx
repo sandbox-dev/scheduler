@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { getJobs, getPictureDayTypes, getSchools } from "@/lib/data";
+import { getEnrollmentStatuses, getJobs, getPictureDayTypes, getSchools } from "@/lib/data";
 import { flattenJobDays } from "@/lib/scheduling";
 import type { JobWithDays } from "@/lib/types";
 import { getMonthsWithDates, monthLabel, pickDefaultMonth, selectableMonths } from "@/lib/month";
@@ -12,6 +12,7 @@ import { SchoolsPanel } from "./SchoolsPanel";
 import { SchoolTypeInput } from "./SchoolTypeInput";
 import { EnrollmentInput } from "./EnrollmentInput";
 import { PictureDayTypeInput } from "./PictureDayTypeInput";
+import { EnrollmentStatusChip } from "./EnrollmentStatusChip";
 
 export default async function JobsPage({
   searchParams,
@@ -34,7 +35,10 @@ export default async function JobsPage({
 
   // Picture day type per job, from the one shared rule — for the box on
   // each job card.
-  const dayTypes = await getPictureDayTypes(jobsThisMonth);
+  const [dayTypes, enrollment] = await Promise.all([
+    getPictureDayTypes(jobsThisMonth),
+    getEnrollmentStatuses(jobsThisMonth.map((j) => j.id)),
+  ]);
 
   const daysNeedingReviewThisMonth = jobsThisMonth.reduce(
     (count, job) =>
@@ -106,7 +110,12 @@ export default async function JobsPage({
               <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <CategoryBadge category={job.category} />
                 <SchoolTypeInput jobId={job.id} schoolType={job.school_type} />
-                <EnrollmentInput jobId={job.id} enrollment={job.enrollment} />
+                <EnrollmentInput
+                  jobId={job.id}
+                  enrollment={job.enrollment}
+                  lastYear={enrollment.get(job.id)?.from === "last_year" ? enrollment.get(job.id)?.number ?? null : null}
+                />
+                <EnrollmentStatusChip jobId={job.id} status={enrollment.get(job.id)} />
                 <PictureDayTypeInput
                   jobId={job.id}
                   resolved={dayTypes.byJob.get(job.id)?.type ?? null}
@@ -114,6 +123,18 @@ export default async function JobsPage({
                   schoolTypes={(job.school_id && dayTypes.schoolTypes.get(job.school_id)) || []}
                 />
               </div>
+              {/* More students than the setups can take (Settings → Enrollment
+                  in Timeline Builder: 150 per station K-12, 75 preschool). */}
+              {enrollment.get(job.id)?.over && (() => {
+                const e = enrollment.get(job.id)!;
+                const students = Math.max(e.number ?? 0, e.rosterCount ?? 0);
+                const fromRoster = (e.rosterCount ?? 0) > (e.number ?? 0);
+                return (
+                  <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 600, color: "var(--bad)" }}>
+                    ⚠ About {students} students{fromRoster ? " on the roster" : e.from === "last_year" ? " (last year's number)" : ""} — more than these setups can take ({e.capacity}). May need another setup.
+                  </div>
+                );
+              })()}
             </div>
             <RemoveJobButton jobId={job.id} />
           </div>

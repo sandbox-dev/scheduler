@@ -95,10 +95,29 @@ export async function updateJobField(
   value: string | number | null
 ) {
   const supabase = await createClient();
+  // A number typed here is the studio's (from the booking call, or a school's
+  // reply) — not confirmed until someone says so (Mark Confirmed), and a
+  // changed number needs confirming again.
+  const extra =
+    field === "enrollment"
+      ? { enrollment_source: value == null ? null : "booking", enrollment_confirmed_at: null }
+      : {};
   await supabase
     .from("jobs")
-    .update({ [field]: value })
+    .update({ [field]: value, ...extra })
     .eq("id", jobId);
+  revalidatePath("/jobs");
+}
+
+// Mark Confirmed / undo on the Jobs page — for a number the studio knows is
+// right (e.g. Steph entering this year's email replies).
+export async function setEnrollmentConfirmed(jobId: string, confirmed: boolean) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("jobs")
+    .update({ enrollment_confirmed_at: confirmed ? new Date().toISOString() : null })
+    .eq("id", jobId);
+  if (error) throw new Error("Couldn't update that — please try again.");
   revalidatePath("/jobs");
 }
 

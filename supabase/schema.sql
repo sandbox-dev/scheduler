@@ -1717,6 +1717,76 @@ $$;
 revoke execute on function resolve_picture_day_types(uuid[]) from public, anon;
 grant execute on function resolve_picture_day_types(uuid[]) to authenticated, service_role;
 
+-- Enrollment status (2026-09-27). Enrollment is a staffing fact (it decides
+-- setups), so it lives here — but it has always arrived late: an emailed ask
+-- under half of schools answer, typed in by hand, often after staffing. These
+-- say where a job's number came from and whether the school confirmed it.
+--   enrollment_source: 'booking' (typed here), 'school' (the school answered
+--   on its portal). Null on numbers entered before this existed.
+--   enrollment_confirmed_at: set when the school answers, or when the studio
+--   marks a number confirmed on the Jobs page.
+alter table jobs add column if not exists enrollment_source text;
+alter table jobs add column if not exists enrollment_confirmed_at timestamptz;
+
+-- The ONE rule for a job's enrollment picture, used by the Jobs page (and,
+-- later, the school's confirm page and the emails):
+--   number     — the job's own enrollment, else last year's (the same
+--                school's most recent earlier booking that had one);
+--   from       — 'this_job' | 'last_year' | null (nothing anywhere);
+--   capacity   — students the job's setups can take: every day's setups
+--                times the per-station number for its category (Timeline
+--                Builder's Settings → Enrollment: K-12 150, Preschool 75);
+--   roster_count — students on the job's Timeline Builder roster, if any;
+--   over       — number or roster count above capacity, and warnings are on.
+-- Security invoker: normal owner rules apply.
+create or replace function job_enrollment_status(p_job_ids uuid[])
+returns table (job_id uuid, number integer, number_from text, confirmed boolean, capacity integer, roster_count integer, over boolean)
+language sql
+stable
+set search_path = public
+as $$
+  with settings as (
+    select coalesce(enrollment_k12_per_station, 150) as k12,
+           coalesce(enrollment_preschool_per_station, 75) as pre,
+           coalesce(enrollment_warnings_on, true) as warn
+      from tb_app_settings limit 1
+  ),
+  base as (
+    select j.id, j.school_id, j.category, j.enrollment, j.enrollment_confirmed_at,
+           (select min(pd.date) from picture_days pd where pd.job_id = j.id) as first_day,
+           (select coalesce(sum(pd.setups), 0) from picture_days pd where pd.job_id = j.id) as station_days
+      from jobs j
+     where j.id = any(p_job_ids)
+  )
+  select b.id,
+         coalesce(b.enrollment, ly.enrollment) as number,
+         case when b.enrollment is not null then 'this_job' when ly.enrollment is not null then 'last_year' end as number_from,
+         b.enrollment_confirmed_at is not null as confirmed,
+         (b.station_days * case when b.category = 'Preschool' then s.pre else s.k12 end)::integer as capacity,
+         rc.n as roster_count,
+         s.warn and b.station_days > 0 and (
+           coalesce(b.enrollment, ly.enrollment, 0) > b.station_days * case when b.category = 'Preschool' then s.pre else s.k12 end
+           or coalesce(rc.n, 0) > b.station_days * case when b.category = 'Preschool' then s.pre else s.k12 end
+         ) as over
+    from base b
+    cross join (select * from settings union all select 150, 75, true where not exists (select 1 from settings)) s
+    left join lateral (
+      select pj.enrollment
+        from jobs pj
+       where pj.school_id = b.school_id and b.school_id is not null and pj.id <> b.id and pj.enrollment is not null
+         and (select min(pd.date) from picture_days pd where pd.job_id = pj.id) < b.first_day
+       order by (select min(pd.date) from picture_days pd where pd.job_id = pj.id) desc
+       limit 1
+    ) ly on true
+    left join lateral (
+      select nullif(count(*), 0)::integer as n
+        from tb_jobs tj join tb_roster_rows r on r.job_id = tj.id
+       where tj.scheduler_job_id = b.id and coalesce(r.role, 'Student') ilike 'student'
+    ) rc on true;
+$$;
+revoke execute on function job_enrollment_status(uuid[]) from public, anon;
+grant execute on function job_enrollment_status(uuid[]) to authenticated, service_role;
+
 -- ===========================================================================
 -- OWNERS LIST — keep this block LAST in the file. (2026-09-25)
 -- ===========================================================================
