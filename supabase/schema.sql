@@ -1672,6 +1672,51 @@ $$;
 
 grant execute on function staff_portal_briefing_for_days(uuid[]) to authenticated;
 
+-- Picture day type (Fall / Spring / Graduation / MUD, or one of the school's
+-- own types like "8th Grade Grad") — booking info, so it lives here. Adi,
+-- 2026-09-27. Null = worked out automatically (see resolve_picture_day_types);
+-- set only when someone corrects it on the Jobs page.
+alter table jobs add column if not exists picture_day_type text;
+
+-- The ONE rule for a job's picture day type. Both apps call this — the
+-- Scheduler's Jobs page to show it, Timeline Builder to follow it — so they
+-- can't work it out differently. In order:
+--   1. picked by hand on the Jobs page;
+--   2. one of the school's own types (its School Details tabs in Timeline
+--      Builder) appears in the booking name;
+--   3. the name says Grad / Graduation;
+--   4. the name ends in Makeup Day / Make Up Day / Make-Up Day;
+--   5. by the first day's date: August onward is Fall, otherwise Spring.
+-- is_auto is false only for 1. Security invoker: normal owner rules apply.
+create or replace function resolve_picture_day_types(p_job_ids uuid[])
+returns table (job_id uuid, picture_day_type text, is_auto boolean)
+language sql
+stable
+set search_path = public
+as $$
+  select j.id,
+         coalesce(
+           nullif(trim(j.picture_day_type), ''),
+           (select t.type_name
+              from tb_schools ts
+              cross join lateral jsonb_array_elements_text(coalesce(ts.picture_day_types, '[]'::jsonb)) as t(type_name)
+             where ts.scheduler_school_id = j.school_id
+               and t.type_name not in ('Fall', 'Spring', 'Graduation', 'MUD')
+               and position(lower(t.type_name) in lower(j.name)) > 0
+             order by length(t.type_name) desc
+             limit 1),
+           case when j.name ~* '\mgrad(uation)?s?\M' then 'Graduation' end,
+           case when j.name ~* '\s+make[\s-]?up\s+day\s*$' then 'MUD' end,
+           (select case when extract(month from min(pd.date)) >= 8 then 'Fall' else 'Spring' end
+              from picture_days pd where pd.job_id = j.id having min(pd.date) is not null)
+         ) as picture_day_type,
+         nullif(trim(j.picture_day_type), '') is null as is_auto
+  from jobs j
+  where j.id = any(p_job_ids);
+$$;
+revoke execute on function resolve_picture_day_types(uuid[]) from public, anon;
+grant execute on function resolve_picture_day_types(uuid[]) to authenticated, service_role;
+
 -- ===========================================================================
 -- OWNERS LIST — keep this block LAST in the file. (2026-09-25)
 -- ===========================================================================

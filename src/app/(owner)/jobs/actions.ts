@@ -179,3 +179,39 @@ export async function deleteSchool(schoolId: string) {
   revalidatePath("/jobs");
   revalidatePath("/staff");
 }
+
+// The Jobs page's Picture Day Type box. Null = automatic (see
+// resolve_picture_day_types). Picking or typing a type the school doesn't
+// have yet also adds it as a tab on the school's Timeline Builder School
+// Details (Adi, 2026-09-27: new types are added "right in the Scheduler
+// picker"), then catches Timeline Builder's job up.
+const EMPTY_TAB = {
+  photo_type: "group", backdrop: "", individual_photo_location: "", group_photo_location: "",
+  wifi_network: "", wifi_password: "", stipulations_notes: "", parking_notes: "",
+};
+export async function updatePictureDayType(jobId: string, value: string | null) {
+  const supabase = await createClient();
+  const type = value?.trim() || null;
+  const { data: job, error } = await supabase.from("jobs").update({ picture_day_type: type }).eq("id", jobId).select("school_id").single();
+  if (error) throw new Error("Couldn't save the picture day type — please try again.");
+
+  if (type && job?.school_id) {
+    const { data: tbSchool } = await supabase
+      .from("tb_schools")
+      .select("id, picture_day_types, picture_day_defaults")
+      .eq("scheduler_school_id", job.school_id)
+      .maybeSingle();
+    if (tbSchool && !((tbSchool.picture_day_types ?? []) as string[]).includes(type)) {
+      const defaults = (tbSchool.picture_day_defaults ?? {}) as Record<string, unknown>;
+      await supabase
+        .from("tb_schools")
+        .update({
+          picture_day_types: [...((tbSchool.picture_day_types ?? []) as string[]), type],
+          picture_day_defaults: { ...defaults, [type]: defaults[type] ?? EMPTY_TAB },
+        })
+        .eq("id", tbSchool.id);
+    }
+  }
+  await syncTimelineBuilderJobs(supabase, jobId);
+  revalidatePath("/jobs");
+}

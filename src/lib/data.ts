@@ -512,3 +512,37 @@ export async function getStaffPortalBriefing(
     return new Map();
   }
 }
+
+// Each job's picture day type, worked out by the one shared rule
+// (resolve_picture_day_types in schema.sql), plus the school's own types from
+// its Timeline Builder School Details tabs for the Jobs page picker. Fails
+// closed to empty maps so the Jobs page never goes down over it.
+export type PictureDayTypeInfo = { type: string | null; isAuto: boolean };
+export async function getPictureDayTypes(jobs: { id: string; school_id: string | null }[]): Promise<{
+  byJob: Map<string, PictureDayTypeInfo>;
+  schoolTypes: Map<string, string[]>;
+}> {
+  const byJob = new Map<string, PictureDayTypeInfo>();
+  const schoolTypes = new Map<string, string[]>();
+  if (jobs.length === 0) return { byJob, schoolTypes };
+  try {
+    const supabase = await createClient();
+    const schoolIds = [...new Set(jobs.map((j) => j.school_id).filter((id): id is string => !!id))];
+    const [{ data: resolved, error }, { data: tbSchools }] = await Promise.all([
+      supabase.rpc("resolve_picture_day_types", { p_job_ids: jobs.map((j) => j.id) }),
+      schoolIds.length
+        ? supabase.from("tb_schools").select("scheduler_school_id, picture_day_types").in("scheduler_school_id", schoolIds)
+        : Promise.resolve({ data: [] as { scheduler_school_id: string; picture_day_types: string[] }[] }),
+    ]);
+    if (error) throw error;
+    for (const r of (resolved ?? []) as { job_id: string; picture_day_type: string | null; is_auto: boolean }[]) {
+      byJob.set(r.job_id, { type: r.picture_day_type, isAuto: r.is_auto });
+    }
+    for (const t of (tbSchools ?? []) as { scheduler_school_id: string; picture_day_types: string[] | null }[]) {
+      schoolTypes.set(t.scheduler_school_id, t.picture_day_types ?? []);
+    }
+  } catch (err) {
+    console.error("getPictureDayTypes failed — hiding picture day types", err);
+  }
+  return { byJob, schoolTypes };
+}
