@@ -128,7 +128,7 @@ export default async function JobsPage({
               {enrollment.get(job.id)?.over && (() => {
                 const e = enrollment.get(job.id)!;
                 const students = Math.max(e.number ?? 0, e.rosterCount ?? 0);
-                const fromRoster = (e.rosterCount ?? 0) > (e.number ?? 0);
+                const fromRoster = e.from === "roster" || (e.rosterCount ?? 0) > (e.number ?? 0);
                 return (
                   <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 600, color: "var(--bad)" }}>
                     ⚠ About {students} students{fromRoster ? " on the roster" : e.from === "last_year" ? " (last year's number)" : ""} — more than these setups can take ({e.capacity}). May need another setup.

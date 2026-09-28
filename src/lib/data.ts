@@ -553,7 +553,7 @@ export async function getPictureDayTypes(jobs: { id: string; school_id: string |
 // than the setups can take. Fails closed to an empty map.
 export type EnrollmentStatus = {
   number: number | null;
-  from: "this_job" | "last_year" | null;
+  from: "this_job" | "roster" | "last_year" | null;
   confirmed: boolean;
   capacity: number;
   rosterCount: number | null;

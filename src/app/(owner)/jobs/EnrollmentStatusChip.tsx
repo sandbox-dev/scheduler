@@ -40,6 +40,9 @@ export function EnrollmentStatusChip({ jobId, status }: { jobId: string; status:
         Mark Confirmed
       </button>
     );
+  } else if (status.from === "roster") {
+    // The school's own roster — as good as confirmed.
+    body = chip(`${status.number} From Roster`, "var(--sage-tint, #e7f1ea)", "var(--navy)");
   } else if (status.from === "last_year") {
     body = chip("From Last Year", "var(--bg)", "var(--muted)");
   } else {
