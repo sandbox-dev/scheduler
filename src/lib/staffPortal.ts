@@ -384,6 +384,10 @@ export type StaffPortalBriefingFields = {
   location_notes: string | null;
   reference_photos_url: string | null;
   setup_photos_url: string | null;
+  // Who to call at the school on picture day. Null until the school answers
+  // (or the studio fills it in on Job Details).
+  day_of_contact_name?: string | null;
+  day_of_contact_phone?: string | null;
 };
 
 // A custom field Adi added with no value filled in yet shouldn't clutter
