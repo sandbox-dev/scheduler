@@ -50,14 +50,9 @@ export default async function JobsPage({
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
         <div className="display" style={{ fontSize: 21, fontWeight: 800 }}>{monthLabel(month)}</div>
         <MonthPicker month={month} months={selectableMonths(monthsWithData)} monthsWithData={monthsWithData} />
-      </div>
-      <div style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 16 }}>
-        Paste rows straight from your spreadsheet. Each row is a Picture Day: date, then setups needed. Adding a job
-        always works regardless of the month selected above — it&apos;ll show up under whichever month its dates fall
-        in.
       </div>
 
       <JobForm schools={schools} />
