@@ -153,6 +153,20 @@ function DayBriefingSection({
           <TimeStat label="Location" value={pictureDay.is_outdoor ? "Outdoor" : "Indoor"} />
         </div>
 
+        {(briefing?.day_of_contact_name || briefing?.day_of_contact_phone) && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Day-Of Contact</div>
+            <div style={{ fontSize: 16, color: "var(--ink)", marginTop: 1 }}>
+              {briefing.day_of_contact_name}
+              {briefing.day_of_contact_name && briefing.day_of_contact_phone ? " — " : ""}
+              {briefing.day_of_contact_phone && (
+                <a href={`tel:${briefing.day_of_contact_phone.replace(/[^0-9+]/g, "")}`} style={{ color: "var(--navy)", fontWeight: 700 }}>
+                  {briefing.day_of_contact_phone}
+                </a>
+              )}
+            </div>
+          </div>
+        )}
         {briefing?.individual_photo_location && (
           <BriefingFact label="Individual Photo Location" value={briefing.individual_photo_location} />
         )}
