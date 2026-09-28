@@ -24,9 +24,26 @@ export function JobForm({ schools }: { schools: School[] }) {
   }
 
   return (
-    <Card style={{ marginBottom: 20 }}>
-      <div className="display" style={{ fontSize: 15.5, fontWeight: 700, marginBottom: 12 }}>Add a Job</div>
-
+    // Folded by default, same as Saved Schools — Adi, 2026-09-27: jobs are
+    // "mostly autofilled from pixifi, and it just takes up a lot of space."
+    <Card style={{ marginBottom: 20, padding: 0 }}>
+      <details>
+      <summary
+        style={{
+          cursor: "pointer",
+          listStyle: "none",
+          padding: "20px 22px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <span>
+          <span className="display" style={{ fontSize: 15.5, fontWeight: 700 }}>Add a Job</span>
+          <span style={{ fontSize: 12.5, color: "var(--muted)", marginLeft: 10 }}>— click to expand</span>
+        </span>
+      </summary>
+      <div style={{ padding: "0 22px 20px" }}>
       <form action={formAction}>
         <input type="hidden" name="schoolId" value={schoolId} />
 
@@ -107,6 +124,8 @@ export function JobForm({ schools }: { schools: School[] }) {
           </button>
         </div>
       </form>
+      </div>
+      </details>
     </Card>
   );
 }
