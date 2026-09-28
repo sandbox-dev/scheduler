@@ -57,7 +57,7 @@ export function arrivalMinutes(fields: StaffPortalTimelineFields): number {
 
 export type StaffPortalDayTimes = { arrival: string; start: string; end: string };
 
-// No sent/approved timeline version exists yet for this Picture Day — there's
+// No approved timeline version exists yet for this Picture Day — there's
 // nothing real to show, so every field reads "TBD" rather than a guessed
 // placeholder.
 export const TBD_TIMES: StaffPortalDayTimes = { arrival: "TBD", start: "TBD", end: "TBD" };

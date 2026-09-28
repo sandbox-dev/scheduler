@@ -119,7 +119,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .map((id) => pictureDayById.get(id))
     .filter((pd): pd is { id: string; date: string; job_id: string } => !!pd);
 
-  // Real start/end times, when Timeline Builder has a sent-or-approved
+  // Real start/end times, when Timeline Builder has an approved
   // version covering the date — same cross-app source and arithmetic as
   // the staff portal's own Arrival/Start/End (src/lib/staffPortal.ts,
   // staff_portal_timeline_for_days() in supabase/schema.sql). Re-queried
@@ -167,9 +167,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 // Mirrors staff_portal_timeline_for_days()'s own lateral-join selection
-// rule in plain JS: the most recent sent-or-approved Timeline Builder
-// version per job (ranked by approved_at, falling back to created_at for a
-// version that's only been sent, never approved), then the one day within
+// rule in plain JS: the most recently approved Timeline Builder version per
+// job (a sent-but-unapproved one never counts), then the one day within
 // that version's snapshot matching this Picture Day's date.
 async function getTimelineFieldsForPictureDays(
   supabase: ReturnType<typeof createServiceRoleClient>,
@@ -198,9 +197,11 @@ async function getTimelineFieldsForPictureDays(
 
   const bestVersionByJob = new Map<string, { snapshot: Record<string, unknown>[]; rank: string }>();
   for (const v of versions) {
+    // Approved timelines only — never a sent-but-unapproved draft (Adi,
+    // 2026-09-27). Same rule as the team app's staff_portal_*_for_days.
     const approvedAt = v.approved_at as string | null;
-    if (approvedAt === null && v.reason !== "sent") continue;
-    const rank = approvedAt ?? (v.created_at as string);
+    if (approvedAt === null) continue;
+    const rank = approvedAt;
     const jobId = v.job_id as string;
     const existing = bestVersionByJob.get(jobId);
     if (!existing || rank > existing.rank) {
