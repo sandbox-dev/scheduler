@@ -33,3 +33,10 @@ export async function markUpdatesSeen(supabase: SupabaseClient, userId: string, 
     console.error("markUpdatesSeen failed", err);
   }
 }
+
+// Clearing is manual (Adi, 2026-09-28) — adds to what this login has read.
+export async function addSeenUpdateIds(supabase: SupabaseClient, userId: string, ids: string[]): Promise<void> {
+  const seen = await seenUpdateIds(supabase, userId);
+  ids.forEach((id) => seen.add(id));
+  await markUpdatesSeen(supabase, userId, [...seen]);
+}
