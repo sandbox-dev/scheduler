@@ -188,6 +188,7 @@ function DayBriefingSection({
         {briefing?.dress_code_note && <BriefingFact label="Dress Code" value={briefing.dress_code_note} />}
         {briefing?.additional_gear_notes && <BriefingFact label="Additional Gear" value={briefing.additional_gear_notes} />}
         {briefing?.notes && <BriefingFact label="Notes" value={briefing.notes} />}
+        {briefing?.school_notes && <BriefingFact label="From The School" value={briefing.school_notes} />}
         {briefing?.wifi_network && (
           <BriefingFact
             label="Wifi"

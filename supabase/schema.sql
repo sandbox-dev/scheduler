@@ -1595,6 +1595,8 @@ grant execute on function staff_portal_briefing_for_days(uuid[]) to authenticate
 -- is_graduation/is_makeup_day already are.
 -- Return columns changed (day-of contact added, 2026-09-28): drop first.
 drop function if exists staff_portal_briefing_for_days(uuid[]);
+-- Return columns changed again (school_notes added, 2026-09-28): drop first.
+drop function if exists staff_portal_briefing_for_days(uuid[]);
 create or replace function staff_portal_briefing_for_days(p_picture_day_ids uuid[])
 returns table(
   picture_day_id uuid,
@@ -1613,7 +1615,10 @@ returns table(
   -- Who to call at the school on picture day (the school answers it on their
   -- portal; editable on Job Details). Adi, 2026-09-28.
   day_of_contact_name text,
-  day_of_contact_phone text
+  day_of_contact_phone text,
+  -- The school's own answer to "Anything we should know about your school?"
+  -- (tb_jobs.stipulations_notes), shown as From The School. 2026-09-28.
+  school_notes text
 )
 language plpgsql
 security definer
@@ -1641,6 +1646,7 @@ begin
       tj.parking_notes,
       tj.day_of_contact_name,
       tj.day_of_contact_phone,
+      tj.stipulations_notes,
       tj.school_id,
       tj.pixifi_custom_fields as job_custom_fields,
       ts.pixifi_custom_fields as school_custom_fields,
@@ -1683,7 +1689,8 @@ begin
     b.reference_photos_url,
     b.setup_photos_url,
     nullif(trim(b.day_of_contact_name), ''),
-    nullif(trim(b.day_of_contact_phone), '')
+    nullif(trim(b.day_of_contact_phone), ''),
+    nullif(trim(b.stipulations_notes), '')
   from base b;
 end;
 $$;
