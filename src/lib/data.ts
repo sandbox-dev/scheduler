@@ -558,6 +558,8 @@ export type EnrollmentStatus = {
   capacity: number;
   rosterCount: number | null;
   over: boolean;
+  // A make-up day — left out of enrollment entirely.
+  skipped: boolean;
 };
 export async function getEnrollmentStatuses(jobIds: string[]): Promise<Map<string, EnrollmentStatus>> {
   const out = new Map<string, EnrollmentStatus>();
@@ -566,8 +568,8 @@ export async function getEnrollmentStatuses(jobIds: string[]): Promise<Map<strin
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("job_enrollment_status", { p_job_ids: jobIds });
     if (error) throw error;
-    for (const r of (data ?? []) as { job_id: string; number: number | null; number_from: EnrollmentStatus["from"]; confirmed: boolean; capacity: number; roster_count: number | null; over: boolean }[]) {
-      out.set(r.job_id, { number: r.number, from: r.number_from, confirmed: r.confirmed, capacity: r.capacity, rosterCount: r.roster_count, over: r.over });
+    for (const r of (data ?? []) as { job_id: string; number: number | null; number_from: EnrollmentStatus["from"]; confirmed: boolean; capacity: number; roster_count: number | null; over: boolean; skipped: boolean | null }[]) {
+      out.set(r.job_id, { number: r.number, from: r.number_from, confirmed: r.confirmed, capacity: r.capacity, rosterCount: r.roster_count, over: r.over, skipped: r.skipped === true });
     }
   } catch (err) {
     console.error("getEnrollmentStatuses failed — hiding enrollment status", err);

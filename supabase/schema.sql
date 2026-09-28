@@ -1740,10 +1740,11 @@ alter table jobs add column if not exists enrollment_confirmed_at timestamptz;
 --     category (Timeline Builder Settings → Enrollment: K-12 150, Preschool 75);
 --   roster_count — this job's roster, if any;
 --   over — the number or the roster above capacity, and warnings are on.
+--   skipped — a make-up day: left out of enrollment entirely.
 -- Security invoker: normal owner rules apply.
 drop function if exists job_enrollment_status(uuid[]);
 create or replace function job_enrollment_status(p_job_ids uuid[])
-returns table (job_id uuid, number integer, number_from text, confirmed boolean, capacity integer, roster_count integer, over boolean)
+returns table (job_id uuid, number integer, number_from text, confirmed boolean, capacity integer, roster_count integer, over boolean, skipped boolean)
 language sql
 stable
 set search_path = public
@@ -1757,7 +1758,8 @@ as $$
   base as (
     select j.id, j.school_id, j.category, j.enrollment, j.enrollment_confirmed_at,
            (select min(pd.date) from picture_days pd where pd.job_id = j.id) as first_day,
-           (select coalesce(sum(pd.setups), 0) from picture_days pd where pd.job_id = j.id) as station_days
+           (select coalesce(sum(pd.setups), 0) from picture_days pd where pd.job_id = j.id) as station_days,
+           coalesce((select r.picture_day_type = 'MUD' from resolve_picture_day_types(array[j.id]) r), false) as is_makeup
       from jobs j
      where j.id = any(p_job_ids)
   ),
@@ -1775,10 +1777,13 @@ as $$
          b.enrollment_confirmed_at is not null as confirmed,
          (b.station_days * case when b.category = 'Preschool' then s.pre else s.k12 end)::integer as capacity,
          rc.n as roster_count,
-         s.warn and b.station_days > 0 and (
+         -- Make-up days are left out entirely — a handful of kids, never asked,
+         -- never warned about (Adi, 2026-09-27).
+         not b.is_makeup and s.warn and b.station_days > 0 and (
            coalesce(b.enrollment, rc.n, ly.n, 0) > b.station_days * case when b.category = 'Preschool' then s.pre else s.k12 end
            or coalesce(rc.n, 0) > b.station_days * case when b.category = 'Preschool' then s.pre else s.k12 end
-         ) as over
+         ) as over,
+         b.is_makeup as skipped
     from base b
     cross join (select * from settings union all select 150, 75, true where not exists (select 1 from settings)) s
     left join roster rc on rc.sched_job_id = b.id
