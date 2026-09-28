@@ -1742,14 +1742,32 @@ alter table jobs add column if not exists enrollment_confirmed_at timestamptz;
 --   over — the number or the roster above capacity, and warnings are on.
 --   skipped — a make-up day: left out of enrollment entirely.
 -- Security invoker: normal owner rules apply.
+-- Speed (2026-09-27): the Jobs page timed out ("canceling statement due to
+-- statement timeout") on the real data — thousands of roster rows, no
+-- indexes, and every row re-checked against the owner rules. So: indexes on
+-- what's looked up by job, and this runs as the table owner (skipping the
+-- per-row rules) after checking ONCE that the caller is an owner (or the
+-- server itself), reading only the rosters for the jobs asked about.
+create index if not exists picture_days_job_id_idx on picture_days (job_id);
+create index if not exists jobs_school_id_idx on jobs (school_id);
+create index if not exists tb_roster_rows_job_id_idx on tb_roster_rows (job_id);
+create index if not exists tb_days_job_id_idx on tb_days (job_id);
+create index if not exists tb_jobs_scheduler_job_id_idx on tb_jobs (scheduler_job_id);
+create index if not exists tb_jobs_school_id_idx on tb_jobs (school_id);
+
 drop function if exists job_enrollment_status(uuid[]);
 create or replace function job_enrollment_status(p_job_ids uuid[])
 returns table (job_id uuid, number integer, number_from text, confirmed boolean, capacity integer, roster_count integer, over boolean, skipped boolean)
 language sql
 stable
+security definer
 set search_path = public
 as $$
-  with settings as (
+  with allowed as (
+    -- Owners, or the server's own key (no login). Anyone else gets nothing.
+    select (auth.uid() is null or is_owner()) as ok
+  ),
+  settings as (
     select coalesce(enrollment_k12_per_station, 150) as k12,
            coalesce(enrollment_preschool_per_station, 75) as pre,
            coalesce(enrollment_warnings_on, true) as warn
@@ -1760,13 +1778,13 @@ as $$
            (select min(pd.date) from picture_days pd where pd.job_id = j.id) as first_day,
            (select coalesce(sum(pd.setups), 0) from picture_days pd where pd.job_id = j.id) as station_days,
            coalesce((select r.picture_day_type = 'MUD' from resolve_picture_day_types(array[j.id]) r), false) as is_makeup
-      from jobs j
-     where j.id = any(p_job_ids)
+      from jobs j, allowed a
+     where a.ok and j.id = any(p_job_ids)
   ),
   roster as (
     select tj.scheduler_job_id as sched_job_id, count(*)::integer as n
       from tb_jobs tj join tb_roster_rows r on r.job_id = tj.id
-     where tj.scheduler_job_id is not null and coalesce(r.role, 'Student') ilike 'student'
+     where tj.scheduler_job_id = any(p_job_ids) and coalesce(r.role, 'Student') ilike 'student'
      group by tj.scheduler_job_id
   )
   select b.id,
@@ -1793,10 +1811,11 @@ as $$
     -- covers every season from before the Scheduler existed).
     left join lateral (
       select c.n from (
-        select coalesce(pj.enrollment, pr.n) as n,
+        select coalesce(pj.enrollment,
+                 (select count(*)::integer from tb_jobs ptj join tb_roster_rows pr on pr.job_id = ptj.id
+                   where ptj.scheduler_job_id = pj.id and coalesce(pr.role, 'Student') ilike 'student')) as n,
                (select min(pd.date) from picture_days pd where pd.job_id = pj.id) as d
           from jobs pj
-          left join roster pr on pr.sched_job_id = pj.id
          where pj.school_id = b.school_id and pj.id <> b.id
         union all
         select (select count(*)::integer from tb_roster_rows r where r.job_id = tj.id and coalesce(r.role, 'Student') ilike 'student') as n,
