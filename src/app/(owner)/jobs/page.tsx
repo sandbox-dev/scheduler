@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { getJobs, getSchools } from "@/lib/data";
+import { getJobs, getPictureDayTypes, getSchools } from "@/lib/data";
 import { flattenJobDays } from "@/lib/scheduling";
 import type { JobWithDays } from "@/lib/types";
 import { getMonthsWithDates, monthLabel, pickDefaultMonth, selectableMonths } from "@/lib/month";
@@ -11,6 +11,7 @@ import { RemoveJobButton } from "./RemoveJobButton";
 import { SchoolsPanel } from "./SchoolsPanel";
 import { SchoolTypeInput } from "./SchoolTypeInput";
 import { EnrollmentInput } from "./EnrollmentInput";
+import { PictureDayTypeInput } from "./PictureDayTypeInput";
 
 export default async function JobsPage({
   searchParams,
@@ -30,6 +31,10 @@ export default async function JobsPage({
         job.picture_days.find((d) => d.date.startsWith(month.slice(0, 7)))?.date ?? "";
       return firstDate(a).localeCompare(firstDate(b));
     });
+
+  // Picture day type per job, from the one shared rule — for the box on
+  // each job card.
+  const dayTypes = await getPictureDayTypes(jobsThisMonth);
 
   const daysNeedingReviewThisMonth = jobsThisMonth.reduce(
     (count, job) =>
@@ -102,6 +107,12 @@ export default async function JobsPage({
                 <CategoryBadge category={job.category} />
                 <SchoolTypeInput jobId={job.id} schoolType={job.school_type} />
                 <EnrollmentInput jobId={job.id} enrollment={job.enrollment} />
+                <PictureDayTypeInput
+                  jobId={job.id}
+                  resolved={dayTypes.byJob.get(job.id)?.type ?? null}
+                  isAuto={dayTypes.byJob.get(job.id)?.isAuto ?? true}
+                  schoolTypes={(job.school_id && dayTypes.schoolTypes.get(job.school_id)) || []}
+                />
               </div>
             </div>
             <RemoveJobButton jobId={job.id} />
