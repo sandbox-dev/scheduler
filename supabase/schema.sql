@@ -1647,6 +1647,7 @@ begin
       tj.day_of_contact_name,
       tj.day_of_contact_phone,
       tj.stipulations_notes,
+      tj.school_notes_for_staff,
       tj.school_id,
       tj.pixifi_custom_fields as job_custom_fields,
       ts.pixifi_custom_fields as school_custom_fields,
@@ -1690,7 +1691,8 @@ begin
     b.setup_photos_url,
     nullif(trim(b.day_of_contact_name), ''),
     nullif(trim(b.day_of_contact_phone), ''),
-    nullif(trim(b.stipulations_notes), '')
+    -- Adi's trimmed staff copy wins once she's edited it (2026-09-28).
+    nullif(trim(coalesce(b.school_notes_for_staff, b.stipulations_notes)), '')
   from base b;
 end;
 $$;
