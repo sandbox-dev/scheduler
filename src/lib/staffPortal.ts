@@ -388,6 +388,8 @@ export type StaffPortalBriefingFields = {
   // (or the studio fills it in on Job Details).
   day_of_contact_name?: string | null;
   day_of_contact_phone?: string | null;
+  // The school's own "Anything we should know about your school?" answer.
+  school_notes?: string | null;
 };
 
 // A custom field Adi added with no value filled in yet shouldn't clutter
