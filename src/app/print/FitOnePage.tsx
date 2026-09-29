@@ -41,12 +41,23 @@ export function FitOnePage({ children }: { children: React.ReactNode }) {
   const [naturalHeight, setNaturalHeight] = useState<number | null>(null);
 
   useEffect(() => {
+    // Shrinks only as much as it has to, and lays out WIDER as it shrinks so
+    // the scaled sheet still fills the page's width (Adi, 2026-09-28: a day
+    // with three schools printed narrow and tiny). Scaling alone shrank the
+    // width too; here each step down gives the grid more room, which cuts
+    // wrapping and height, so it usually fits at a much larger size.
     function recompute() {
       const el = ref.current;
       if (!el) return;
-      const { scrollHeight } = el;
-      setNaturalHeight(scrollHeight);
-      setScale(Math.min(1, AVAILABLE_HEIGHT_PX / scrollHeight));
+      let s = 1;
+      for (; s > 0.4; s -= 0.02) {
+        el.style.width = `${AVAILABLE_WIDTH_PX / s}px`;
+        if (el.scrollHeight * s <= AVAILABLE_HEIGHT_PX) break;
+      }
+      s = Math.max(s, 0.4);
+      el.style.width = `${AVAILABLE_WIDTH_PX / s}px`;
+      setNaturalHeight(el.scrollHeight);
+      setScale(s);
     }
     recompute();
     // Re-checked right before the browser actually prints — a logo image or
@@ -70,11 +81,11 @@ export function FitOnePage({ children }: { children: React.ReactNode }) {
           follows anyway. */}
       <div
         style={{
-          width: AVAILABLE_WIDTH_PX * scale,
+          width: AVAILABLE_WIDTH_PX,
           height: naturalHeight != null ? naturalHeight * scale : undefined,
         }}
       >
-        <div ref={ref} style={{ width: AVAILABLE_WIDTH_PX, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+        <div ref={ref} style={{ width: AVAILABLE_WIDTH_PX / scale, transform: `scale(${scale})`, transformOrigin: "top left" }}>
           {children}
         </div>
       </div>
