@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { missingShootNotes, type ShootNotesAnswers } from "./shootNotes";
 
 const full: ShootNotesAnswers = {
-  filled_by: ["Luis"], location_same: true, location_note: "", on_time: true, timeline_note: "",
-  parking_as_described: true, parking_note: "", setup_as_expected: true, setup_note: "", other_notes: "", next_time: "",
+  filled_by: ["Luis"], individual_as_expected: true, individual_note: "", on_time: true, timeline_note: "",
+  parking_as_described: true, parking_note: "", group_as_expected: true, group_note: "", other_notes: "", next_time: "",
 };
 
 describe("missingShootNotes", () => {
