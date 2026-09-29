@@ -556,13 +556,14 @@ export default async function TeamPage({
                     {/* After-the-day feedback, its own action after Timeline.
                         In the team app since 2026-09-29 (was a Google Form).
                         Once anyone on the team sends it, everyone just sees
-                        it's done — never the answers. Only from the day itself
-                        on. */}
+                        it's done — never the answers. Shown on every day, like
+                        the Google Form button was (Adi couldn't find it when it
+                        only appeared from the day itself on). */}
                     {shootNotesDone.has(a.picture_day.id) ? (
                       <div style={{ marginTop: 14, textAlign: "center", fontSize: 15, fontWeight: 700, color: "var(--good)" }}>
                         <CheckCircle2 size={14} style={{ verticalAlign: -2 }} /> Shoot Notes: Done
                       </div>
-                    ) : a.picture_day.date <= today ? (
+                    ) : (
                       <Link
                         href={`/team/shoot-notes/${a.picture_day.id}`}
                         className="btn-rose"
@@ -570,7 +571,7 @@ export default async function TeamPage({
                       >
                         <NotebookPen size={13} /> Fill Out Shoot Notes
                       </Link>
-                    ) : null}
+                    )}
                   </div>
                 </details>
               </Card>
