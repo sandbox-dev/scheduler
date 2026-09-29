@@ -179,16 +179,20 @@ export async function getSubmittedStaffIdsForMonth(month: string): Promise<Set<s
 // fuzzy school-name/date guessing, same reasoning timeline-builder's own
 // import already uses. Fails closed to an empty map so a hiccup here can
 // never take down the Schedule page itself.
-export async function getTimelineBuilderJobIds(schedulerJobIds: string[]): Promise<Map<string, string>> {
+// Timeline Builder job id + its linked TB school id (null when the job isn't
+// linked to a school there yet), for the Job Details / School buttons on the
+// Jobs and Schedule pages.
+export type TimelineBuilderLink = { jobId: string; schoolId: string | null };
+export async function getTimelineBuilderJobIds(schedulerJobIds: string[]): Promise<Map<string, TimelineBuilderLink>> {
   if (schedulerJobIds.length === 0) return new Map();
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("tb_jobs")
-      .select("id, scheduler_job_id")
+      .select("id, scheduler_job_id, school_id")
       .in("scheduler_job_id", schedulerJobIds);
     if (error) throw error;
-    return new Map((data || []).map((r) => [r.scheduler_job_id as string, r.id as string]));
+    return new Map((data || []).map((r) => [r.scheduler_job_id as string, { jobId: r.id as string, schoolId: (r.school_id as string | null) ?? null }]));
   } catch (err) {
     console.error("getTimelineBuilderJobIds failed — hiding the timeline links", err);
     return new Map();

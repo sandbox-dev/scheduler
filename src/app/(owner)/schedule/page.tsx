@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { LayoutList, CalendarRange, ChevronLeft, ChevronRight, Users, Download, ExternalLink } from "lucide-react";
+import { TimelineBuilderLinks } from "@/components/TimelineBuilderLinks";
+import { LayoutList, CalendarRange, ChevronLeft, ChevronRight, Users, Download } from "lucide-react";
 import {
   getApprovalForMonth,
   getAvailability,
@@ -353,23 +354,7 @@ export default async function SchedulePage({
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        {/* Only shows for a job actually imported from here into
-                            Timeline Builder — nothing to guess at otherwise (see
-                            getTimelineBuilderJobIds). Requires
-                            NEXT_PUBLIC_TIMELINE_BUILDER_URL to be set — a
-                            separate Vercel deployment, so this is a real
-                            cross-site link, not an in-app route. */}
-                        {timelineBuilderJobIds.get(jd.jobId) && process.env.NEXT_PUBLIC_TIMELINE_BUILDER_URL && (
-                          <a
-                            href={`${process.env.NEXT_PUBLIC_TIMELINE_BUILDER_URL}/jobs/${timelineBuilderJobIds.get(jd.jobId)}/details`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn-secondary"
-                            style={{ fontSize: 12 }}
-                          >
-                            <ExternalLink size={12} /> Details
-                          </a>
-                        )}
+                        <TimelineBuilderLinks link={timelineBuilderJobIds.get(jd.jobId)} />
                         <LockJobButton jobId={jd.jobId} locked={lockedJobIds.has(jd.jobId)} jobName={jd.jobName} />
                       </div>
                     </div>
