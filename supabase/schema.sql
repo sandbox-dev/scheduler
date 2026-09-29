@@ -1920,3 +1920,117 @@ begin
   end loop;
 end;
 $$;
+
+-- ---------- Shoot Notes (2026-09-29) ----------
+-- The after-the-day feedback form, moved in from a Google Form. One per
+-- picture day (the team fills it in together on site). It's for the owners
+-- only: staff submit it through staff_submit_shoot_notes() and can only ever
+-- learn whether it's done (staff_portal_shoot_notes_done) — never the answers.
+-- Questions (verbatim from the Google Form):
+--   location_same   "Was the location for Individual & Group Photo the same as on the event info notes provided?"
+--   on_time         "Timeline - On time?"
+--   parking_as_described "Was parking as described in event info notes?"
+--   setup_as_expected    "Was the set up location as expected?"
+--   other_notes     "Other" / next_time "For Next Time"
+create table if not exists shoot_notes (
+  id uuid primary key default gen_random_uuid(),
+  picture_day_id uuid not null unique references picture_days(id) on delete cascade,
+  submitted_by uuid references staff(id) on delete set null,
+  filled_by text[] not null default '{}',
+  location_same boolean not null,
+  location_note text not null default '',
+  on_time boolean not null,
+  timeline_note text not null default '',
+  parking_as_described boolean not null,
+  parking_note text not null default '',
+  setup_as_expected boolean not null,
+  setup_note text not null default '',
+  other_notes text not null default '',
+  next_time text not null default '',
+  submitted_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  reviewed_by uuid
+);
+alter table shoot_notes enable row level security;
+-- Deliberately NOT named "owners full access" (that name gets the owners-or-
+-- team restrictive policy above, which would let staff read it).
+drop policy if exists "owners only" on shoot_notes;
+create policy "owners only" on shoot_notes for all to authenticated using (is_owner()) with check (is_owner());
+
+create or replace function staff_submit_shoot_notes(
+  p_picture_day_id uuid,
+  p_filled_by text[],
+  p_location_same boolean,
+  p_location_note text,
+  p_on_time boolean,
+  p_timeline_note text,
+  p_parking_as_described boolean,
+  p_parking_note text,
+  p_setup_as_expected boolean,
+  p_setup_note text,
+  p_other_notes text,
+  p_next_time text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_staff_id uuid;
+begin
+  select id into v_staff_id from staff where auth_user_id = auth.uid();
+  if v_staff_id is null then
+    return jsonb_build_object('error', 'not_staff');
+  end if;
+  if not exists (select 1 from schedule_assignments where picture_day_id = p_picture_day_id and staff_id = v_staff_id) then
+    return jsonb_build_object('error', 'not_assigned');
+  end if;
+  if exists (select 1 from shoot_notes where picture_day_id = p_picture_day_id) then
+    return jsonb_build_object('error', 'already_submitted');
+  end if;
+  if p_location_same is null or p_on_time is null or p_parking_as_described is null or p_setup_as_expected is null
+     or coalesce(array_length(p_filled_by, 1), 0) = 0 then
+    return jsonb_build_object('error', 'incomplete');
+  end if;
+  insert into shoot_notes (
+    picture_day_id, submitted_by, filled_by,
+    location_same, location_note, on_time, timeline_note,
+    parking_as_described, parking_note, setup_as_expected, setup_note,
+    other_notes, next_time
+  ) values (
+    p_picture_day_id, v_staff_id, p_filled_by,
+    p_location_same, coalesce(trim(p_location_note), ''), p_on_time, coalesce(trim(p_timeline_note), ''),
+    p_parking_as_described, coalesce(trim(p_parking_note), ''), p_setup_as_expected, coalesce(trim(p_setup_note), ''),
+    coalesce(trim(p_other_notes), ''), coalesce(trim(p_next_time), '')
+  );
+  return jsonb_build_object('ok', true);
+end;
+$$;
+revoke execute on function staff_submit_shoot_notes(uuid, text[], boolean, text, boolean, text, boolean, text, boolean, text, text, text) from public, anon;
+grant execute on function staff_submit_shoot_notes(uuid, text[], boolean, text, boolean, text, boolean, text, boolean, text, text, text) to authenticated;
+
+-- Which of the caller's own picture days already have Shoot Notes — just
+-- that, never the answers.
+create or replace function staff_portal_shoot_notes_done(p_picture_day_ids uuid[])
+returns table(picture_day_id uuid)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_staff_id uuid;
+begin
+  select id into v_staff_id from staff where auth_user_id = auth.uid();
+  if v_staff_id is null then
+    return;
+  end if;
+  return query
+  select sn.picture_day_id
+  from shoot_notes sn
+  where sn.picture_day_id = any(p_picture_day_ids)
+    and exists (select 1 from schedule_assignments sa where sa.picture_day_id = sn.picture_day_id and sa.staff_id = v_staff_id);
+end;
+$$;
+revoke execute on function staff_portal_shoot_notes_done(uuid[]) from public, anon;
+grant execute on function staff_portal_shoot_notes_done(uuid[]) to authenticated;
