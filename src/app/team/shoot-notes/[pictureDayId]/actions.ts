@@ -22,14 +22,14 @@ export async function submitShootNotes(pictureDayId: string, a: ShootNotesAnswer
   const { data, error } = await supabase.rpc("staff_submit_shoot_notes", {
     p_picture_day_id: pictureDayId,
     p_filled_by: a.filled_by,
-    p_location_same: a.location_same,
-    p_location_note: a.location_same ? "" : a.location_note,
+    p_individual_as_expected: a.individual_as_expected,
+    p_individual_note: a.individual_as_expected ? "" : a.individual_note,
     p_on_time: a.on_time,
     p_timeline_note: a.on_time ? "" : a.timeline_note,
     p_parking_as_described: a.parking_as_described,
     p_parking_note: a.parking_as_described ? "" : a.parking_note,
-    p_setup_as_expected: a.setup_as_expected,
-    p_setup_note: a.setup_as_expected ? "" : a.setup_note,
+    p_group_as_expected: a.group_as_expected,
+    p_group_note: a.group_as_expected ? "" : a.group_note,
     p_other_notes: a.other_notes,
     p_next_time: a.next_time,
   });

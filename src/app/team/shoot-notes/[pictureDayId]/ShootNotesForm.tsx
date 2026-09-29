@@ -21,14 +21,14 @@ const hintStyle: React.CSSProperties = { fontSize: 14, color: "var(--muted)", ma
 export function ShootNotesForm({ pictureDayId, team, me }: { pictureDayId: string; team: string[]; me: string }) {
   const [a, setA] = useState<ShootNotesAnswers>({
     filled_by: team.includes(me) ? [me] : [],
-    location_same: null,
-    location_note: "",
+    individual_as_expected: null,
+    individual_note: "",
     on_time: null,
     timeline_note: "",
     parking_as_described: null,
     parking_note: "",
-    setup_as_expected: null,
-    setup_note: "",
+    group_as_expected: null,
+    group_note: "",
     other_notes: "",
     next_time: "",
   });
