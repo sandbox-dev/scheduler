@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, NotebookPen } from "lucide-react";
+import { CalendarPlus, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, NotebookPen } from "lucide-react";
 import { Card, RoleTag } from "@/components/ui";
 import { CalendarSubscribeLink } from "./CalendarSubscribeLink";
 import {
@@ -10,6 +10,7 @@ import {
   getStaffPortalCrew,
   getStaffPortalFullTimeline,
   getStaffPortalTimelineTimes,
+  getShootNotesDone,
   type StaffPortalAssignment,
 } from "@/lib/data";
 import { addDays, mondayOf, todayPacific } from "@/lib/month";
@@ -420,11 +421,12 @@ export default async function TeamPage({
   const weekEnd = addDays(weekStart, 6);
   const assignments = await getMyAssignments(account.id, weekStart, weekEnd);
   const pictureDayIds = assignments.map((a) => a.picture_day.id);
-  const [timelineTimes, fullTimelines, briefings, crews] = await Promise.all([
+  const [timelineTimes, fullTimelines, briefings, crews, shootNotesDone] = await Promise.all([
     getStaffPortalTimelineTimes(pictureDayIds),
     getStaffPortalFullTimeline(pictureDayIds),
     getStaffPortalBriefing(pictureDayIds),
     getStaffPortalCrew(pictureDayIds),
+    getShootNotesDone(pictureDayIds),
   ]);
   const firstName = account.name.split(" ")[0];
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -551,25 +553,24 @@ export default async function TeamPage({
 
                     <FullTimelineSection timelineFields={fields} fullDay={fullTimelines.get(a.picture_day.id) ?? null} />
 
-                    {/* Deliberately NOT inside any of the four sectionBoxStyle
-                        boxes above (Schedule/Team/Details/Timeline) — those
-                        are all the before-the-job plan. This is the
-                        after-the-job feedback form, a genuinely separate
-                        concept from Details/Event Info, so it gets its own
-                        distinct styling (.btn-rose, same "reads as its own
-                        distinct action" treatment as the Check Pixifi button
-                        on the owner side) instead of blending in as one more
-                        Details fact. Placed last, after Timeline, since a
-                        staff member fills this out once their day is done. */}
-                    <a
-                      href="https://docs.google.com/forms/d/e/1FAIpQLSemK3O5lFUIuGHxl9gZfkhVLIi2AN7yfmq3w1rj_Lc_W4xyog/viewform"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn-rose"
-                      style={{ marginTop: 14, width: "100%", justifyContent: "center" }}
-                    >
-                      <NotebookPen size={13} /> Fill Out Shoot Notes <ExternalLink size={12} />
-                    </a>
+                    {/* After-the-day feedback, its own action after Timeline.
+                        In the team app since 2026-09-29 (was a Google Form).
+                        Once anyone on the team sends it, everyone just sees
+                        it's done — never the answers. Only from the day itself
+                        on. */}
+                    {shootNotesDone.has(a.picture_day.id) ? (
+                      <div style={{ marginTop: 14, textAlign: "center", fontSize: 15, fontWeight: 700, color: "var(--good)" }}>
+                        <CheckCircle2 size={14} style={{ verticalAlign: -2 }} /> Shoot Notes: Done
+                      </div>
+                    ) : a.picture_day.date <= today ? (
+                      <Link
+                        href={`/team/shoot-notes/${a.picture_day.id}`}
+                        className="btn-rose"
+                        style={{ marginTop: 14, width: "100%", justifyContent: "center" }}
+                      >
+                        <NotebookPen size={13} /> Fill Out Shoot Notes
+                      </Link>
+                    ) : null}
                   </div>
                 </details>
               </Card>

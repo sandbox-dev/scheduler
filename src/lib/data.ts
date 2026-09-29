@@ -585,3 +585,19 @@ export async function getEnrollmentStatuses(jobIds: string[]): Promise<Map<strin
   }
   return out;
 }
+
+// Which of this staff member's picture days already have Shoot Notes — only
+// whether it's done, never the answers (staff_portal_shoot_notes_done).
+// Fails closed to "none done", which just shows the Fill Out button.
+export async function getShootNotesDone(pictureDayIds: string[]): Promise<Set<string>> {
+  if (pictureDayIds.length === 0) return new Set();
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("staff_portal_shoot_notes_done", { p_picture_day_ids: pictureDayIds });
+    if (error) throw error;
+    return new Set((data as { picture_day_id: string }[]).map((r) => r.picture_day_id));
+  } catch (err) {
+    console.error("getShootNotesDone failed", err);
+    return new Set();
+  }
+}
