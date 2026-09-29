@@ -69,7 +69,7 @@ export function PrintSheet({
 
   // Each Photographer gets their own row + case number (a multi-setup day
   // sends out one case per photographer, not one for the whole day).
-  // Each photographer as "Name (Case N)", with the day's dedicated group
+  // Each photographer as "Name — Case N", with the day's dedicated group
   // photographer split out (Adi, 2026-09-28: the sheet "just says
   // photographer").
   function photographerRowsFor(jd: (typeof allDays)[number]) {
@@ -77,7 +77,7 @@ export function PrintSheet({
       .filter((a) => a.role === "Photographer")
       .sort((a, b) => a.slot_index - b.slot_index)
       .map((a) => ({
-        label: `${a.staff_id ? staffById.get(a.staff_id)?.name || "unfilled" : "unfilled"}${a.equipment_case ? ` (Case ${a.equipment_case})` : ""}`,
+        label: `${a.staff_id ? staffById.get(a.staff_id)?.name || "unfilled" : "unfilled"}${a.equipment_case ? ` — Case ${a.equipment_case}` : ""}`,
         isGroup: isGroupPhotoSlot(jd, "Photographer", a.slot_index),
       }));
   }
@@ -255,7 +255,7 @@ export function PrintSheet({
   );
 }
 
-// Each "Name (Case N)" stays on one line — it only wraps between people
+// Each "Name — Case N" stays on one line — it only wraps between people
 // (Adi, 2026-09-28: "(Case" and "1)" were splitting).
 function NoBreakList({ items }: { items: string[] }) {
   return (
