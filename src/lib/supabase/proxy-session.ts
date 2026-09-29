@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { MIGRATED_MARKER, isSupabaseAuthCookie, sharedCookieDomain } from "./cookieDomain";
 
 // /api/webhooks and /api/cron are intentionally public here — those routes
 // authenticate themselves via a shared secret (ZAPIER_WEBHOOK_SECRET /
@@ -28,13 +29,15 @@ function isStaffAreaPath(pathname: string) {
   return pathname === STAFF_AREA_PATH || pathname.startsWith(`${STAFF_AREA_PATH}/`);
 }
 
-export async function updateSession(request: NextRequest) {
+async function updateSessionInner(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const domain = sharedCookieDomain(request.headers.get("host"));
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      ...(domain ? { cookieOptions: { domain } } : {}),
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -73,6 +76,21 @@ export async function updateSession(request: NextRequest) {
   const { data: staffRow } = await supabase.from("staff").select("id").eq("auth_user_id", user.id).maybeSingle();
   const isStaffAccount = !!staffRow;
 
+  // With one login across hub./portal./team. (see cookieDomain.ts), someone
+  // who's neither staff nor an owner (a leftover school login) can now arrive
+  // signed in. Keep them on the sign-in pages instead of empty owner pages.
+  // Fails open on a lookup error — the database is the real lock.
+  if (!isStaffAccount) {
+    const owner = await supabase.rpc("is_owner");
+    if (!owner.error && owner.data !== true) {
+      if (pathname === "/login" || pathname === "/team/login" || isPublicPath(pathname)) return response;
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (pathname === "/login" || pathname === "/team/login") {
     const url = request.nextUrl.clone();
     url.pathname = isStaffAccount ? "/team" : "/overview";
@@ -96,5 +114,27 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  return response;
+}
+
+export async function updateSession(request: NextRequest) {
+  const response = await updateSessionInner(request);
+  const domain = sharedCookieDomain(request.headers.get("host"));
+  if (!domain || request.cookies.has(MIGRATED_MARKER)) return response;
+  // One-time move of this host's old login cookies onto the shared domain —
+  // see cookieDomain.ts. Skipped for any cookie this response already set.
+  // Raw headers, not response.cookies: that keeps one cookie per name, and
+  // this needs two per name (delete the host-only copy, set the shared one).
+  const alreadySet = new Set(response.cookies.getAll().map((c) => c.name));
+  const maxAge = 400 * 24 * 60 * 60;
+  for (const c of request.cookies.getAll()) {
+    if (!isSupabaseAuthCookie(c.name)) continue;
+    // Always drop the host-only copy; only copy it over if this response
+    // didn't just write a fresh (shared) one itself.
+    response.headers.append("Set-Cookie", `${c.name}=; Path=/; Max-Age=0; SameSite=Lax; Secure`);
+    if (alreadySet.has(c.name)) continue;
+    response.headers.append("Set-Cookie", `${c.name}=${encodeURIComponent(c.value)}; Domain=${domain}; Path=/; Max-Age=${maxAge}; SameSite=Lax; Secure`);
+  }
+  response.headers.append("Set-Cookie", `${MIGRATED_MARKER}=1; Path=/; Max-Age=${maxAge}; SameSite=Lax; Secure`);
   return response;
 }
