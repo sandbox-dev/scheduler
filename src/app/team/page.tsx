@@ -95,13 +95,11 @@ function DayBriefingSection({
   pictureDay,
   briefing,
   crew,
-  hasReferencePhotos,
 }: {
   job: StaffPortalAssignment["job"];
   pictureDay: StaffPortalAssignment["picture_day"];
   briefing: StaffPortalBriefingFields | null;
   crew: StaffPortalCrewMember[];
-  hasReferencePhotos: boolean;
 }) {
   return (
     <>
@@ -175,16 +173,7 @@ function DayBriefingSection({
             Moved here beside Parking Notes 2026-09-28 — Adi: "so we know
             its there" (it used to sit alone under the address). */}
         {briefing?.location_notes && <BriefingFact label="Location Notes" value={briefing.location_notes} />}
-        {briefing?.parking_notes && (
-          <>
-            <BriefingFact label="Parking Notes" value={briefing.parking_notes} />
-            {hasReferencePhotos && (
-              <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic", marginTop: 2 }}>
-                See Reference Photos folder for any parking maps or photos
-              </div>
-            )}
-          </>
-        )}
+        {briefing?.parking_notes && <BriefingFact label="Parking Notes" value={briefing.parking_notes} />}
         {briefing?.dress_code_note && <BriefingFact label="Dress Code" value={briefing.dress_code_note} />}
         {briefing?.additional_gear_notes && <BriefingFact label="Additional Gear" value={briefing.additional_gear_notes} />}
         {briefing?.notes && <BriefingFact label="Notes" value={briefing.notes} />}
@@ -558,7 +547,6 @@ export default async function TeamPage({
                       pictureDay={a.picture_day}
                       briefing={briefing}
                       crew={crews.get(a.picture_day.id) ?? []}
-                      hasReferencePhotos={!!briefing?.reference_photos_url}
                     />
 
                     <FullTimelineSection timelineFields={fields} fullDay={fullTimelines.get(a.picture_day.id) ?? null} />
