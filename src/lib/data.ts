@@ -1,4 +1,5 @@
 import "server-only";
+import { isGroupPhotoSlot } from "./scheduling";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Availability,
@@ -236,6 +237,9 @@ export async function getMyStaffAccount(): Promise<StaffPortalAccount | null> {
 export type StaffPortalAssignment = {
   id: string;
   role: Role;
+  // The day's dedicated group photographer (see isGroupPhotoSlot) — shown
+  // as "Group Photographer" instead of plain Photographer (Adi, 2026-09-28).
+  is_group_photographer: boolean;
   equipment_case: string;
   picture_day: { id: string; date: string; setups: number; is_outdoor: boolean };
   job: { id: string; name: string; category: string; school_type: string };
@@ -274,7 +278,7 @@ export async function getMyAssignments(
 
   const { data: assignments, error: assignmentsError } = await supabase
     .from("schedule_assignments")
-    .select("id, role, equipment_case, picture_day_id, job_id")
+    .select("id, role, slot_index, equipment_case, picture_day_id, job_id")
     .eq("staff_id", staffId);
   if (assignmentsError) throw assignmentsError;
   if (!assignments || assignments.length === 0) return [];
@@ -288,7 +292,7 @@ export async function getMyAssignments(
   // day of a job it's assigned to. Still a strict superset of this staff
   // member's own assigned days, so it doubles as the lookup for those too.
   const [{ data: allJobPictureDays, error: pdError }, { data: jobs, error: jobsError }] = await Promise.all([
-    supabase.from("picture_days").select("id, date, setups, is_outdoor, job_id").in("job_id", jobIds),
+    supabase.from("picture_days").select("id, date, setups, is_outdoor, has_group_photo, job_id").in("job_id", jobIds),
     supabase.from("jobs").select("id, name, school_id, category, school_type").in("id", jobIds),
   ]);
   if (pdError) throw pdError;
@@ -332,6 +336,7 @@ export async function getMyAssignments(
       return {
         id: a.id,
         role: a.role as Role,
+        is_group_photographer: isGroupPhotoSlot({ setups: pictureDay.setups, has_group_photo: !!pictureDay.has_group_photo }, a.role as Role, a.slot_index),
         equipment_case: a.equipment_case,
         picture_day: { id: pictureDay.id, date: pictureDay.date, setups: pictureDay.setups, is_outdoor: pictureDay.is_outdoor },
         job: {
@@ -444,9 +449,9 @@ export async function getStaffPortalCrew(
     });
     if (error) throw error;
     const byDay = new Map<string, StaffPortalCrewMember[]>();
-    for (const row of data as { picture_day_id: string; staff_name: string; role: Role }[]) {
+    for (const row of data as { picture_day_id: string; staff_name: string; role: Role; is_group_photographer?: boolean }[]) {
       const list = byDay.get(row.picture_day_id) ?? [];
-      list.push({ name: row.staff_name, role: row.role });
+      list.push({ name: row.staff_name, role: row.role, is_group_photographer: !!row.is_group_photographer });
       byDay.set(row.picture_day_id, list);
     }
     for (const [day, list] of byDay) byDay.set(day, sortStaffPortalCrew(list));

@@ -120,7 +120,7 @@ function DayBriefingSection({
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {crew.map((member, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16 }}>
-                <RoleTag role={member.role} />
+                <RoleTag role={member.role} label={member.is_group_photographer ? "Group Photographer" : undefined} />
                 <span>{member.name}</span>
               </div>
             ))}
@@ -512,7 +512,7 @@ export default async function TeamPage({
                         </div>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                        <RoleTag role={a.role} />
+                        <RoleTag role={a.role} label={a.is_group_photographer ? "Group Photographer" : undefined} />
                         <ChevronDown size={18} className="day-card-chevron" style={{ color: "var(--muted)" }} />
                       </div>
                     </div>

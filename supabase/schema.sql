@@ -1362,11 +1362,17 @@ grant execute on function staff_portal_full_timeline_for_days(uuid[]) to authent
 -- + role, nothing else on staff (no phone/email/pin/distance/priority) — a
 -- coworker has a real reason to know who else is on the shoot, never a
 -- reason to see anyone else's contact info or pay-relevant fields.
+-- Return columns changed (is_group_photographer, 2026-09-28): drop first.
+drop function if exists staff_portal_crew_for_days(uuid[]);
 create or replace function staff_portal_crew_for_days(p_picture_day_ids uuid[])
 returns table(
   picture_day_id uuid,
   staff_name text,
-  role text
+  role text,
+  -- The day's dedicated group photographer: the Photographer slot at index
+  -- = setups on a has_group_photo day (isGroupPhotoSlot in scheduling.ts).
+  -- Added 2026-09-28.
+  is_group_photographer boolean
 )
 language plpgsql
 security definer
@@ -1384,9 +1390,11 @@ begin
   select
     sa.picture_day_id,
     s.name,
-    sa.role
+    sa.role,
+    (sa.role = 'Photographer' and pd.has_group_photo and sa.slot_index = pd.setups)
   from schedule_assignments sa
   join staff s on s.id = sa.staff_id
+  join picture_days pd on pd.id = sa.picture_day_id
   where sa.picture_day_id = any(p_picture_day_ids)
     and exists (
       select 1
