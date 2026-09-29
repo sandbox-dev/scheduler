@@ -73,7 +73,8 @@ export function FitOnePage({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <style>{`@page { size: landscape; margin: ${PAGE_MARGIN_IN}in; }`}</style>
+      {/* Printed: no side padding, and the sheet centered on the page. */}
+      <style>{`@page { size: landscape; margin: ${PAGE_MARGIN_IN}in; } @media print { .print-root { padding: 0 !important; } }`}</style>
       {/* Outer box reserves only the SHRUNK footprint in normal document
           flow — transform alone doesn't do this, it only changes how the
           element paints, so without an explicit height here the original
@@ -82,6 +83,7 @@ export function FitOnePage({ children }: { children: React.ReactNode }) {
       <div
         style={{
           width: AVAILABLE_WIDTH_PX,
+          margin: "0 auto",
           height: naturalHeight != null ? naturalHeight * scale : undefined,
         }}
       >

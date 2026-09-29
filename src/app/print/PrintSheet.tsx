@@ -87,7 +87,7 @@ export function PrintSheet({
   const busy = week.map((d) => (jobsByDate.get(d.date) || []).length > 0);
 
   return (
-    <div style={{ padding: "28px 30px", fontFamily: "Inter, sans-serif", color: "var(--ink)", background: "#fff" }}>
+    <div className="print-root" style={{ padding: "28px 30px", fontFamily: "Inter, sans-serif", color: "var(--ink)", background: "#fff" }}>
       <PrintControls
         prevWeek={shiftWeek(weekStart, -1)}
         nextWeek={shiftWeek(weekStart, 1)}
@@ -147,6 +147,7 @@ export function PrintSheet({
                 fontWeight: 700,
                 color: "var(--navy)",
                 background: "var(--purple)",
+                textAlign: "center",
               }}
             >
               {wd.toUpperCase()} {md}
@@ -213,12 +214,12 @@ export function PrintSheet({
                 </div>
                 <div style={{ marginTop: 4 }}>
                   <span style={{ color: ROLE_COLOR.Photographer, fontWeight: 700 }}>Photographer:</span>{" "}
-                  {hasSchedule ? regular.map((r) => r.label).join(", ") || "unfilled" : jd.crew.Photographer - (jd.has_group_photo ? 1 : 0)}
+                  {hasSchedule ? (regular.length ? <NoBreakList items={regular.map((r) => r.label)} /> : "unfilled") : jd.crew.Photographer - (jd.has_group_photo ? 1 : 0)}
                 </div>
                 {jd.has_group_photo && (
                   <div>
                     <span style={{ color: ROLE_COLOR.Photographer, fontWeight: 700 }}>Group Photographer:</span>{" "}
-                    {hasSchedule ? group.map((r) => r.label).join(", ") || "unfilled" : 1}
+                    {hasSchedule ? (group.length ? <NoBreakList items={group.map((r) => r.label)} /> : "unfilled") : 1}
                   </div>
                 )}
                 {jd.crew.Assistant > 0 && (
@@ -251,5 +252,20 @@ export function PrintSheet({
       </div>
       </FitOnePage>
     </div>
+  );
+}
+
+// Each "Name (Case N)" stays on one line — it only wraps between people
+// (Adi, 2026-09-28: "(Case" and "1)" were splitting).
+function NoBreakList({ items }: { items: string[] }) {
+  return (
+    <>
+      {items.map((t, i) => (
+        <span key={i}>
+          <span style={{ whiteSpace: "nowrap" }}>{t}</span>
+          {i < items.length - 1 ? ", " : ""}
+        </span>
+      ))}
+    </>
   );
 }
