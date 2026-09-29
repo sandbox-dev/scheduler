@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, CalendarDays, Users, CheckCircle2, Award, DollarSign, LogOut, Megaphone } from "lucide-react";
+import { Sparkles, CalendarDays, Users, CheckCircle2, Award, DollarSign, LogOut, Megaphone, Boxes } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { NEW_TAG_STYLE } from "@/app/(owner)/whats-new/newTagStyle";
 
@@ -33,7 +33,15 @@ export function Nav({ unseenUpdates = 0 }: { unseenUpdates?: number }) {
       </div>
       <div className="tab-bar">
         {TABS.map((t) => (
-          <Link key={t.href} href={t.href} className={`tab-pill ${pathname.startsWith(t.href) ? "active" : ""}`}>
+          <span key={t.href} style={{ display: "contents" }}>
+          {/* The other app, just before What's New so that stays last
+              (Adi, 2026-09-28). Same login covers both. */}
+          {t.href === "/whats-new" && (
+            <a href={process.env.NEXT_PUBLIC_TIMELINE_BUILDER_URL || "https://hub.sandboxphotographers.com"} className="tab-pill">
+              <Boxes size={14} /> The Sandbox
+            </a>
+          )}
+          <Link href={t.href} className={`tab-pill ${pathname.startsWith(t.href) ? "active" : ""}`}>
             <t.icon size={14} /> {t.label}
             {t.href === "/whats-new" && unseenUpdates > 0 && (
               <span style={{ ...NEW_TAG_STYLE, fontSize: 10.5, padding: "0 6px", marginLeft: 2 }}>
@@ -41,6 +49,7 @@ export function Nav({ unseenUpdates = 0 }: { unseenUpdates?: number }) {
               </span>
             )}
           </Link>
+          </span>
         ))}
       </div>
     </div>
