@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
-import { getEnrollmentStatuses, getJobs, getPictureDayTypes, getSchools } from "@/lib/data";
+import { getEnrollmentStatuses, getJobs, getPictureDayTypes, getSchools, getTimelineBuilderJobIds } from "@/lib/data";
+import { TimelineBuilderLinks } from "@/components/TimelineBuilderLinks";
 import { flattenJobDays } from "@/lib/scheduling";
 import type { JobWithDays } from "@/lib/types";
 import { getMonthsWithDates, monthLabel, pickDefaultMonth, selectableMonths } from "@/lib/month";
@@ -35,9 +36,10 @@ export default async function JobsPage({
 
   // Picture day type per job, from the one shared rule — for the box on
   // each job card.
-  const [dayTypes, enrollment] = await Promise.all([
+  const [dayTypes, enrollment, tbLinks] = await Promise.all([
     getPictureDayTypes(jobsThisMonth),
     getEnrollmentStatuses(jobsThisMonth.map((j) => j.id)),
+    getTimelineBuilderJobIds(jobsThisMonth.map((j) => j.id)),
   ]);
 
   const daysNeedingReviewThisMonth = jobsThisMonth.reduce(
@@ -131,7 +133,10 @@ export default async function JobsPage({
                 );
               })()}
             </div>
-            <RemoveJobButton jobId={job.id} />
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <TimelineBuilderLinks link={tbLinks.get(job.id)} />
+              <RemoveJobButton jobId={job.id} />
+            </div>
           </div>
           <table className="data-table" style={{ marginTop: 14 }}>
             <thead>
