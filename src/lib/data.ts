@@ -601,3 +601,21 @@ export async function getShootNotesDone(pictureDayIds: string[]): Promise<Set<st
     return new Set();
   }
 }
+
+// Each Scheduler job's backdrop from The Sandbox (tb_jobs.backdrop, fed by
+// the school's season tab), for the weekly sheet's Gear line. Owners only;
+// fails to an empty map, which just leaves Backdrop off the sheet.
+export async function getTimelineBuilderBackdrops(schedulerJobIds: string[]): Promise<Map<string, string>> {
+  if (schedulerJobIds.length === 0) return new Map();
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("tb_jobs").select("scheduler_job_id, backdrop").in("scheduler_job_id", schedulerJobIds);
+    if (error) throw error;
+    return new Map(
+      (data || []).filter((r) => (r.backdrop ?? "").trim()).map((r) => [r.scheduler_job_id as string, (r.backdrop as string).trim()])
+    );
+  } catch (err) {
+    console.error("getTimelineBuilderBackdrops failed — leaving Backdrop off the sheet", err);
+    return new Map();
+  }
+}

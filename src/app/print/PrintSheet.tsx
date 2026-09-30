@@ -18,11 +18,14 @@ export function PrintSheet({
   staff,
   assignments,
   week: weekParam,
+  backdrops,
 }: {
   jobs: Awaited<ReturnType<typeof getJobs>>;
   staff: Awaited<ReturnType<typeof getStaff>>;
   assignments: Awaited<ReturnType<typeof getScheduleAssignments>>;
   week?: string;
+  // Scheduler job id → backdrop (from The Sandbox), for the Gear line.
+  backdrops?: Map<string, string>;
 }) {
   const sp = { week: weekParam };
 
@@ -81,6 +84,9 @@ export function PrintSheet({
         isGroup: isGroupPhotoSlot(jd, "Photographer", a.slot_index),
       }));
   }
+
+  // A job with Babies on any of its days needs baby gear every day.
+  const babiesJobs = new Set(allDays.filter((d) => d.is_babies).map((d) => d.jobId));
 
   // Days with no picture days get a narrow column, so busy days get the
   // width (Adi, 2026-09-28: three schools in one day printed tiny).
@@ -207,10 +213,15 @@ export function PrintSheet({
                   {jd.setups ? `${jd.schoolType ? " · " : ""}${jd.setups} setup${jd.setups === 1 ? "" : "s"}` : ""}
                   {jd.enrollment ? ` · ${jd.enrollment} students` : ""}
                 </div>
-                <div style={{ color: "var(--muted)" }}>
-                  {[jd.is_outdoor && "Outdoor", jd.has_group_photo && "+ Group photo", jd.is_babies && "Babies"]
-                    .filter(Boolean)
-                    .join(", ")}
+                {jd.has_group_photo && <div style={{ color: "var(--muted)" }}>+ Group photo</div>}
+                {/* Gear for the week (Adi, 2026-09-30: "we use that to get
+                    gear ready for the week"): backdrop, indoor/outdoor, and
+                    Babies — for the whole job, since Babies on one day
+                    covers the job. */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, margin: "3px 0 1px" }}>
+                  {backdrops?.get(jd.jobId) && <GearTag>Backdrop: {backdrops.get(jd.jobId)}</GearTag>}
+                  <GearTag>{jd.is_outdoor ? "Outdoor" : "Indoor"}</GearTag>
+                  {babiesJobs.has(jd.jobId) && <GearTag strong>Babies</GearTag>}
                 </div>
                 <div style={{ marginTop: 4 }}>
                   <span style={{ color: ROLE_COLOR.Photographer, fontWeight: 700 }}>Photographer:</span>{" "}
@@ -267,5 +278,27 @@ function NoBreakList({ items }: { items: string[] }) {
         </span>
       ))}
     </>
+  );
+}
+
+function GearTag({ children, strong }: { children: React.ReactNode; strong?: boolean }) {
+  return (
+    <span
+      style={{
+        fontSize: "9.5pt",
+        fontWeight: strong ? 800 : 600,
+        padding: "0 7px",
+        borderRadius: 999,
+        // An outline, not a fill: fills vanish when Background graphics is
+        // off in the print dialog.
+        border: strong ? "2px solid var(--navy)" : "1px solid var(--line)",
+        color: strong ? "var(--navy)" : "var(--ink)",
+        textTransform: strong ? "uppercase" : undefined,
+        letterSpacing: strong ? "0.04em" : undefined,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </span>
   );
 }
