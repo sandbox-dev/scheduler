@@ -221,7 +221,7 @@ export function PrintSheet({
                     Babies — for the whole job, since Babies on one day
                     covers the job. */}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, margin: "3px 0 1px" }}>
-                  {backdrops?.get(jd.jobId) && <GearTag>Backdrop: {backdrops.get(jd.jobId)}</GearTag>}
+                  {backdrops?.get(jd.jobId) && <GearTag tone={backdropTone(backdrops.get(jd.jobId)!)}>Backdrop: {backdrops.get(jd.jobId)}</GearTag>}
                   {/* Group photos need their own gear whether or not there's a
                       dedicated group photographer; *asterisks* = there is one
                       (Adi, 2026-09-30). */}
@@ -298,6 +298,11 @@ const GEAR_TAG_COLORS = {
   outdoor: { bg: "#DCEFE3", border: "#9CCBAE", color: "#1E6B43" },
   babies: { bg: "#F9DDE7", border: "#E7A6BD", color: "#9B2F57" },
   group: { bg: "#DDEAF8", border: "#9DBFE6", color: "#1F4E86" },
+  // The two backdrops, in their own colors — solid, so they don't read as
+  // the light Indoor/Outdoor tags (Adi, 2026-09-30: "we only have two
+  // backdrops, gray and ivy wall").
+  ivy: { bg: "#3F7A47", border: "#2F5E36", color: "#FFFFFF" },
+  gray: { bg: "#7D8187", border: "#5F6368", color: "#FFFFFF" },
 } as const;
 
 function GearTag({ children, tone = "plain" }: { children: React.ReactNode; tone?: keyof typeof GEAR_TAG_COLORS }) {
@@ -323,4 +328,10 @@ function GearTag({ children, tone = "plain" }: { children: React.ReactNode; tone
 // "K-5 + Group Photos" → "K-5": group photos are their own tag now.
 function schoolTypeText(schoolType: string | null | undefined): string {
   return (schoolType ?? "").replace(/\s*\+\s*group photos?/i, "").trim();
+}
+
+function backdropTone(name: string): "ivy" | "gray" | "plain" {
+  if (/ivy|green/i.test(name)) return "ivy";
+  if (/gr[ae]y/i.test(name)) return "gray";
+  return "plain";
 }
