@@ -512,6 +512,25 @@ export default async function TeamPage({
                         <div className="display" style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>
                           {a.school?.name ?? a.job.name}
                         </div>
+                        {/* Baby gear needed (Adi, 2026-09-30) — same pink tag as
+                            the weekly printable sheet, on every day of the job. */}
+                        {a.picture_day.is_babies && (
+                          <span
+                            style={{
+                              display: "inline-block",
+                              marginTop: 6,
+                              fontSize: 13,
+                              fontWeight: 700,
+                              padding: "1px 10px",
+                              borderRadius: 999,
+                              background: "#F9DDE7",
+                              border: "1px solid #E7A6BD",
+                              color: "#9B2F57",
+                            }}
+                          >
+                            Babies
+                          </span>
+                        )}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                         <RoleTag role={a.role} label={a.is_group_photographer ? "Group Photographer" : undefined} />

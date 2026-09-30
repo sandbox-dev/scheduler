@@ -241,7 +241,9 @@ export type StaffPortalAssignment = {
   // as "Group Photographer" instead of plain Photographer (Adi, 2026-09-28).
   is_group_photographer: boolean;
   equipment_case: string;
-  picture_day: { id: string; date: string; setups: number; is_outdoor: boolean };
+  // is_babies is for the whole job — Babies on any of its days means baby
+  // gear every day (same rule as the weekly sheet).
+  picture_day: { id: string; date: string; setups: number; is_outdoor: boolean; is_babies: boolean };
   job: { id: string; name: string; category: string; school_type: string };
   // Deliberately minimal — location_notes/reference_photos_url/
   // setup_photos_url used to live here too (this app's own schools.
@@ -292,7 +294,7 @@ export async function getMyAssignments(
   // day of a job it's assigned to. Still a strict superset of this staff
   // member's own assigned days, so it doubles as the lookup for those too.
   const [{ data: allJobPictureDays, error: pdError }, { data: jobs, error: jobsError }] = await Promise.all([
-    supabase.from("picture_days").select("id, date, setups, is_outdoor, has_group_photo, job_id").in("job_id", jobIds),
+    supabase.from("picture_days").select("id, date, setups, is_outdoor, has_group_photo, is_babies, job_id").in("job_id", jobIds),
     supabase.from("jobs").select("id, name, school_id, category, school_type").in("id", jobIds),
   ]);
   if (pdError) throw pdError;
@@ -318,6 +320,7 @@ export async function getMyAssignments(
   // count/position rather than "how many days of this job I'm on." See
   // computeJobDayPosition() in src/lib/staffPortal.ts for the actual ranking
   // (and its own dedup-duplicate-dates handling).
+  const babiesJobs = new Set((allJobPictureDays || []).filter((pd) => pd.is_babies).map((pd) => pd.job_id as string));
   const datesByJob = new Map<string, string[]>();
   for (const pd of allJobPictureDays || []) {
     const dates = datesByJob.get(pd.job_id) ?? [];
@@ -338,7 +341,7 @@ export async function getMyAssignments(
         role: a.role as Role,
         is_group_photographer: isGroupPhotoSlot({ setups: pictureDay.setups, has_group_photo: !!pictureDay.has_group_photo }, a.role as Role, a.slot_index),
         equipment_case: a.equipment_case,
-        picture_day: { id: pictureDay.id, date: pictureDay.date, setups: pictureDay.setups, is_outdoor: pictureDay.is_outdoor },
+        picture_day: { id: pictureDay.id, date: pictureDay.date, setups: pictureDay.setups, is_outdoor: pictureDay.is_outdoor, is_babies: babiesJobs.has(a.job_id) },
         job: {
           id: job.id,
           name: job.name,
