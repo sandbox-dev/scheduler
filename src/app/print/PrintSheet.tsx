@@ -220,8 +220,8 @@ export function PrintSheet({
                     covers the job. */}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, margin: "3px 0 1px" }}>
                   {backdrops?.get(jd.jobId) && <GearTag>Backdrop: {backdrops.get(jd.jobId)}</GearTag>}
-                  <GearTag>{jd.is_outdoor ? "Outdoor" : "Indoor"}</GearTag>
-                  {babiesJobs.has(jd.jobId) && <GearTag strong>Babies</GearTag>}
+                  <GearTag tone={jd.is_outdoor ? "outdoor" : "indoor"}>{jd.is_outdoor ? "Outdoor" : "Indoor"}</GearTag>
+                  {babiesJobs.has(jd.jobId) && <GearTag tone="babies">Babies</GearTag>}
                 </div>
                 <div style={{ marginTop: 4 }}>
                   <span style={{ color: ROLE_COLOR.Photographer, fontWeight: 700 }}>Photographer:</span>{" "}
@@ -281,20 +281,27 @@ function NoBreakList({ items }: { items: string[] }) {
   );
 }
 
-function GearTag({ children, strong }: { children: React.ReactNode; strong?: boolean }) {
+// Adi, 2026-09-30: Indoor grey, Outdoor green, Babies pink. Fills print
+// because the sheet forces print colors (see FitOnePage).
+const GEAR_TAG_COLORS = {
+  plain: { bg: "#fff", border: "var(--line)", color: "var(--ink)" },
+  indoor: { bg: "#E7E7EA", border: "#C9C9CF", color: "#3F3F46" },
+  outdoor: { bg: "#DCEFE3", border: "#9CCBAE", color: "#1E6B43" },
+  babies: { bg: "#F9DDE7", border: "#E7A6BD", color: "#9B2F57" },
+} as const;
+
+function GearTag({ children, tone = "plain" }: { children: React.ReactNode; tone?: keyof typeof GEAR_TAG_COLORS }) {
+  const c = GEAR_TAG_COLORS[tone];
   return (
     <span
       style={{
         fontSize: "9.5pt",
-        fontWeight: strong ? 800 : 600,
-        padding: "0 7px",
+        fontWeight: tone === "plain" ? 600 : 700,
+        padding: "0 8px",
         borderRadius: 999,
-        // An outline, not a fill: fills vanish when Background graphics is
-        // off in the print dialog.
-        border: strong ? "2px solid var(--navy)" : "1px solid var(--line)",
-        color: strong ? "var(--navy)" : "var(--ink)",
-        textTransform: strong ? "uppercase" : undefined,
-        letterSpacing: strong ? "0.04em" : undefined,
+        border: `1px solid ${c.border}`,
+        background: c.bg,
+        color: c.color,
         whiteSpace: "nowrap",
       }}
     >
