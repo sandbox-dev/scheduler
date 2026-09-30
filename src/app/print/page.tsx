@@ -1,4 +1,4 @@
-import { getJobs, getScheduleAssignments, getStaff, getTimelineBuilderBackdrops } from "@/lib/data";
+import { getJobs, getScheduleAssignments, getStaff, getTimelineBuilderGear } from "@/lib/data";
 import { PrintSheet } from "./PrintSheet";
 
 export default async function PrintPage({
@@ -8,6 +8,6 @@ export default async function PrintPage({
 }) {
   const sp = await searchParams;
   const [jobs, staff, assignments] = await Promise.all([getJobs(), getStaff(), getScheduleAssignments()]);
-  const backdrops = await getTimelineBuilderBackdrops(jobs.map((j) => j.id));
-  return <PrintSheet jobs={jobs} staff={staff} assignments={assignments} week={sp.week} backdrops={backdrops} />;
+  const { backdrops, groupPhotoJobs } = await getTimelineBuilderGear(jobs.map((j) => j.id));
+  return <PrintSheet jobs={jobs} staff={staff} assignments={assignments} week={sp.week} backdrops={backdrops} groupPhotoJobs={groupPhotoJobs} />;
 }
