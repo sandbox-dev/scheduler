@@ -13,7 +13,8 @@ import { MIGRATED_MARKER, isSupabaseAuthCookie, sharedCookieDomain } from "./coo
 // AGENTS.md §22) — without this, every poll would 307 to /login instead of
 // ever reaching the feed (caught only by hitting the route for real after
 // deploying; nothing in the test suite exercises this proxy).
-const PUBLIC_PATHS = ["/login", "/team/login", "/availability", "/auth", "/api/webhooks", "/api/cron", "/api/calendar"];
+// /api/build: the live build id, for the "please refresh" bar (2026-09-30).
+const PUBLIC_PATHS = ["/login", "/team/login", "/availability", "/auth", "/api/webhooks", "/api/cron", "/api/calendar", "/api/build"];
 
 export function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
