@@ -19,6 +19,7 @@ export function PrintSheet({
   assignments,
   week: weekParam,
   backdrops,
+  groupPhotoJobs,
 }: {
   jobs: Awaited<ReturnType<typeof getJobs>>;
   staff: Awaited<ReturnType<typeof getStaff>>;
@@ -26,6 +27,8 @@ export function PrintSheet({
   week?: string;
   // Scheduler job id → backdrop (from The Sandbox), for the Gear line.
   backdrops?: Map<string, string>;
+  // Scheduler job ids whose Class Photo is Group (from The Sandbox).
+  groupPhotoJobs?: Set<string>;
 }) {
   const sp = { week: weekParam };
 
@@ -209,17 +212,22 @@ export function PrintSheet({
                   )}
                 </div>
                 <div style={{ color: "var(--muted)" }}>
-                  {jd.schoolType}
-                  {jd.setups ? `${jd.schoolType ? " · " : ""}${jd.setups} setup${jd.setups === 1 ? "" : "s"}` : ""}
+                  {schoolTypeText(jd.schoolType)}
+                  {jd.setups ? `${schoolTypeText(jd.schoolType) ? " · " : ""}${jd.setups} setup${jd.setups === 1 ? "" : "s"}` : ""}
                   {jd.enrollment ? ` · ${jd.enrollment} students` : ""}
                 </div>
-                {jd.has_group_photo && <div style={{ color: "var(--muted)" }}>+ Group photo</div>}
                 {/* Gear for the week (Adi, 2026-09-30: "we use that to get
                     gear ready for the week"): backdrop, indoor/outdoor, and
                     Babies — for the whole job, since Babies on one day
                     covers the job. */}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, margin: "3px 0 1px" }}>
                   {backdrops?.get(jd.jobId) && <GearTag>Backdrop: {backdrops.get(jd.jobId)}</GearTag>}
+                  {/* Group photos need their own gear whether or not there's a
+                      dedicated group photographer; *asterisks* = there is one
+                      (Adi, 2026-09-30). */}
+                  {(groupPhotoJobs?.has(jd.jobId) || jd.has_group_photo || /group photo/i.test(jd.schoolType ?? "")) && (
+                    <GearTag tone="group">{jd.has_group_photo ? "*Group Photos*" : "Group Photos"}</GearTag>
+                  )}
                   <GearTag tone={jd.is_outdoor ? "outdoor" : "indoor"}>{jd.is_outdoor ? "Outdoor" : "Indoor"}</GearTag>
                   {babiesJobs.has(jd.jobId) && <GearTag tone="babies">Babies</GearTag>}
                 </div>
@@ -260,6 +268,7 @@ export function PrintSheet({
       <div style={{ marginTop: 14, fontSize: "10pt", color: "var(--muted)", fontWeight: 600 }}>
         <span style={{ borderTop: "3px solid var(--outdoor)", paddingTop: 3, marginRight: 18 }}>Outdoor</span>
         <span style={{ borderTop: "3px solid var(--indoor)", paddingTop: 3 }}>Indoor</span>
+        <span style={{ marginLeft: 18 }}>*Group Photos* = dedicated group photographer</span>
       </div>
       </FitOnePage>
     </div>
@@ -288,6 +297,7 @@ const GEAR_TAG_COLORS = {
   indoor: { bg: "#E7E7EA", border: "#C9C9CF", color: "#3F3F46" },
   outdoor: { bg: "#DCEFE3", border: "#9CCBAE", color: "#1E6B43" },
   babies: { bg: "#F9DDE7", border: "#E7A6BD", color: "#9B2F57" },
+  group: { bg: "#DDEAF8", border: "#9DBFE6", color: "#1F4E86" },
 } as const;
 
 function GearTag({ children, tone = "plain" }: { children: React.ReactNode; tone?: keyof typeof GEAR_TAG_COLORS }) {
@@ -308,4 +318,9 @@ function GearTag({ children, tone = "plain" }: { children: React.ReactNode; tone
       {children}
     </span>
   );
+}
+
+// "K-5 + Group Photos" → "K-5": group photos are their own tag now.
+function schoolTypeText(schoolType: string | null | undefined): string {
+  return (schoolType ?? "").replace(/\s*\+\s*group photos?/i, "").trim();
 }
