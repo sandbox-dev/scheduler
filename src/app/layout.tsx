@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 
 export const metadata: Metadata = {
   title: "Picture Day Scheduler — Sandbox Photographers",
@@ -13,7 +14,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {/* Every page, team app included — see UpdateAvailableBanner. */}
+        <UpdateAvailableBanner />
+        {children}
+      </body>
     </html>
   );
 }
