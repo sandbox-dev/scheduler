@@ -14,7 +14,7 @@ import { MIGRATED_MARKER, isSupabaseAuthCookie, sharedCookieDomain } from "./coo
 // ever reaching the feed (caught only by hitting the route for real after
 // deploying; nothing in the test suite exercises this proxy).
 // /api/build: the live build id, for the "please refresh" bar (2026-09-30).
-const PUBLIC_PATHS = ["/login", "/team/login", "/availability", "/auth", "/api/webhooks", "/api/cron", "/api/calendar", "/api/build"];
+const PUBLIC_PATHS = ["/login", "/team/login", "/availability", "/auth", "/api/webhooks", "/api/cron", "/api/calendar", "/api/build", "/team/welcome"];
 
 export function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -106,7 +106,9 @@ async function updateSessionInner(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (!isStaffAccount && isStaffAreaPath(pathname)) {
+  // (Not the invite set-up page — an owner signed in on the same browser
+  // can still open a staff member's link.)
+  if (!isStaffAccount && isStaffAreaPath(pathname) && !isPublicPath(pathname)) {
     // An owner landed on the staff area by mistake — send them back to the
     // owner app rather than showing them (or letting them fall into) a
     // staff-only page.
