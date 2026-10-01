@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { CategoryToggleChip, RoleToggleChip } from "@/components/ui";
 import { SavableField } from "@/components/SavableField";
+import { TeamAppAccess } from "./TeamAppAccess";
 import { QUALIFICATIONS, ROLES, type Staff } from "@/lib/types";
 import {
   setStaffActive,
@@ -127,6 +128,7 @@ export function StaffRow({ staff }: { staff: Staff }) {
           >
             Paid mileage
           </button>
+          {staff.active && <TeamAppAccess staff={staff} />}
         </div>
       </td>
     </tr>

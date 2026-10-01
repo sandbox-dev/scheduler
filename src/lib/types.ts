@@ -107,6 +107,11 @@ export type Staff = {
   // keep working indefinitely. Never shown on the owner-facing Staff page;
   // surfaced only to the staff member themselves on /team.
   calendar_token: string;
+  // Team app login (staff.auth_user_id) and the latest invite — see
+  // teamAccessActions.ts. Optional until the SQL has run.
+  auth_user_id?: string | null;
+  team_invited_at?: string | null;
+  team_invite_expires_at?: string | null;
 };
 
 export type Availability = {

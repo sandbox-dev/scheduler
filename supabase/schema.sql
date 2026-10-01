@@ -2049,3 +2049,12 @@ end;
 $$;
 revoke execute on function staff_portal_shoot_notes_done(uuid[]) from public, anon;
 grant execute on function staff_portal_shoot_notes_done(uuid[]) to authenticated;
+
+-- ---------- Team app invites (2026-10-01) ----------
+-- "Invite To Team App" on the Staff page: links a login to the staff row
+-- and emails a one-time set-up link (/team/welcome/<token>, 14 days). Our own
+-- token rather than Supabase's invite email, which expires in an hour and
+-- would log them in unlinked.
+alter table staff add column if not exists team_invite_token uuid unique;
+alter table staff add column if not exists team_invite_expires_at timestamptz;
+alter table staff add column if not exists team_invited_at timestamptz;
