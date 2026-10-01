@@ -132,6 +132,8 @@ export type StaffPortalTimelineDay = {
   photo_start_offset_minutes: number;
   group_start_offset_minutes: number | null;
   individual_setups: number;
+  // false = group photos aren't kept back to back (see scheduleGroupTrack).
+  groups_consecutive?: boolean;
   blocks: StaffPortalBlock[];
 };
 
@@ -202,11 +204,20 @@ function scheduleMainTrack(blocks: StaffPortalBlock[], startMinutes: number, ind
 function scheduleGroupTrack(
   blocks: StaffPortalBlock[],
   startMinutes: number,
-  individualTimesByGrade: Map<string, { start: number; end: number }>
+  individualTimesByGrade: Map<string, { start: number; end: number }>,
+  consecutive = true
 ): StaffPortalScheduledBlock[] {
   const ordered = [...blocks].sort((a, b) => a.sort_order - b.sort_order);
   const results: StaffPortalScheduledBlock[] = [];
   let cursor = startMinutes;
+  // Group photos set by hand hold their time and the rest fit around them,
+  // same as timeline-builder's scheduleGroupTrack (2026-10-01).
+  const pinned = ordered
+    .filter((b) => b.fixed_start_time)
+    .map((b) => {
+      const start = timeToMinutes(b.fixed_start_time!);
+      return { id: b.id, start, end: roundTo5(start + blockDurationMinutes(b)) };
+    });
 
   for (const b of ordered) {
     const dur = blockDurationMinutes(b);
@@ -214,19 +225,33 @@ function scheduleGroupTrack(
 
     let earliest = cursor;
     const ind = b.grade_label ? individualTimesByGrade.get(b.grade_label.trim().toLowerCase()) : undefined;
-    if (ind) {
-      const clashes = (from: number) => {
-        const to = from + dur;
-        const gap = to <= ind.start ? ind.start - to : from >= ind.end ? from - ind.end : -1;
-        return gap < DEFAULT_TRACK_GAP_MINUTES;
-      };
-      if (clashes(earliest)) earliest = ind.end + DEFAULT_TRACK_GAP_MINUTES;
+    const clashes = (from: number) => {
+      if (!ind) return false;
+      const to = from + dur;
+      const gap = to <= ind.start ? ind.start - to : from >= ind.end ? from - ind.end : -1;
+      return gap < DEFAULT_TRACK_GAP_MINUTES;
+    };
+    if (setStart === null) {
+      for (let guard = 0; guard < 50; guard++) {
+        if (clashes(earliest)) {
+          earliest = ind!.end + DEFAULT_TRACK_GAP_MINUTES;
+          continue;
+        }
+        const end = roundTo5(earliest + dur);
+        const blocker = pinned.find((p) => p.id !== b.id && earliest < p.end && end > p.start);
+        if (blocker) {
+          earliest = blocker.end;
+          continue;
+        }
+        break;
+      }
     }
 
     const startAt = setStart ?? earliest;
     const endMinutes = roundTo5(startAt + dur);
     results.push({ ...b, startMinutes: startAt, endMinutes });
-    cursor = endMinutes;
+    // Not back to back: a hand-set one doesn't drag the rest along.
+    cursor = consecutive || setStart === null ? endMinutes : cursor;
   }
 
   return results;
@@ -249,7 +274,7 @@ export function computeStaffPortalBlockTimes(day: StaffPortalTimelineDay): Staff
     }
   }
 
-  const groupScheduled = scheduleGroupTrack(groupBlocks, groupStart, individualTimesByGrade);
+  const groupScheduled = scheduleGroupTrack(groupBlocks, groupStart, individualTimesByGrade, day.groups_consecutive !== false);
   return [...mainScheduled, ...groupScheduled];
 }
 
