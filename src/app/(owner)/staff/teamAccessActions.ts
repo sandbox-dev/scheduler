@@ -32,7 +32,7 @@ export type TeamAccessResult = { ok: true; message: string } | { error: string }
 // Invite To Team App / Resend Invite (Adi, 2026-10-01).
 export async function inviteToTeamApp(staffId: string): Promise<TeamAccessResult> {
   const admin = createServiceRoleClient();
-  const { data: staff } = await admin.from("staff").select("id, name, email, auth_user_id").eq("id", staffId).maybeSingle();
+  const { data: staff } = await admin.from("staff").select("id, name, email, auth_user_id, team_invite_expires_at").eq("id", staffId).maybeSingle();
   if (!staff) return { error: "Couldn't find that staff member." };
   const email = (staff.email ?? "").trim();
   if (!email) return { error: `Add an email for ${staff.name} first.` };
@@ -59,21 +59,23 @@ export async function inviteToTeamApp(staffId: string): Promise<TeamAccessResult
   if (linkError) return { error: "Couldn't link the login — please try again." };
 
   const first = (staff.name as string).split(" ")[0];
+  // Already set up (e.g. a forgotten password): same link, reset wording.
+  const isReset = !!staff.auth_user_id && !staff.team_invite_expires_at;
   const link = `${teamBase()}/team/welcome/${token}`;
   const sent = await sendGmailMessage({
     to: email,
-    subject: "Your Sandbox team app login",
+    subject: isReset ? "Reset your Sandbox team app password" : "Your Sandbox team app login",
     htmlBody: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#20232B;">
 <p style="margin:0 0 14px;">Hi ${esc(first)},</p>
-<p style="margin:0 0 14px;">Your schedule, each picture day's details and timeline, and Shoot Notes now all live in the Sandbox team app. Set up your login here:</p>
-<p style="margin:20px 0;"><a href="${link}" style="display:inline-block;background:#3D5A6C;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;">SET UP YOUR ACCOUNT</a></p>
+<p style="margin:0 0 14px;">${isReset ? "Here's a link to choose a new password for the Sandbox team app:" : "Your schedule, each picture day's details and timeline, and Shoot Notes now all live in the Sandbox team app. Set up your login here:"}</p>
+<p style="margin:20px 0;"><a href="${link}" style="display:inline-block;background:#3D5A6C;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;">${isReset ? "RESET YOUR PASSWORD" : "SET UP YOUR ACCOUNT"}</a></p>
 <p style="margin:0 0 14px;">You'll choose a password, then you're in. This link works for ${INVITE_DAYS} days.</p>
-<p style="margin:0 0 14px;"><strong>Tip:</strong> once you're in, add it to your phone's home screen (Share, then Add to Home Screen on iPhone), and tap Subscribe to your calendar so your picture days show up there too.</p>
+${isReset ? "" : `<p style="margin:0 0 14px;"><strong>Tip:</strong> once you're in, add it to your phone's home screen (Share, then Add to Home Screen on iPhone), and tap Subscribe to your calendar so your picture days show up there too.</p>`}
 <p style="margin:24px 0 0;color:#6B7280;font-size:13px;">— Sandbox Photographers</p></div>`,
   });
   revalidatePath("/staff");
   if (!sent.ok) return { error: `The login is set up, but the email didn't send (${sent.error}). Try Resend Invite.` };
-  return { ok: true, message: `✓ Invite sent to ${email}.` };
+  return { ok: true, message: isReset ? `✓ Password reset link sent to ${email}.` : `✓ Invite sent to ${email}.` };
 }
 
 // Remove Team App Access — deletes their login, so they can't sign in.

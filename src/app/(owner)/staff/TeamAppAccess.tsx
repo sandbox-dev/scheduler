@@ -31,7 +31,8 @@ export function TeamAppAccess({ staff }: { staff: Staff }) {
       {status && (
         <span style={{ fontSize: 11, fontWeight: 700, color: status === "Active" ? "var(--good)" : "var(--navy)" }}>Team App: {status}</span>
       )}
-      {!linked || waiting ? (
+      {/* Same link for a forgotten password once they're Active. */}
+      {staff.email ? (
         <button
           type="button"
           className="btn-secondary"
@@ -40,13 +41,16 @@ export function TeamAppAccess({ staff }: { staff: Staff }) {
           onClick={() =>
             run(
               () => inviteToTeamApp(staff.id),
-              `${waiting ? "Resend" : "Send"} ${staff.name} an invite to the team app?\n\nIt emails ${staff.email || "them"} a link to set a password (good for 14 days).`
+              status === "Active"
+                ? `Send ${staff.name} a link to reset their team app password?\n\nIt emails ${staff.email || "them"} a link to choose a new one (good for 14 days). Their current password keeps working until they do.`
+                : `${waiting ? "Resend" : "Send"} ${staff.name} an invite to the team app?\n\nIt emails ${staff.email || "them"} a link to set a password (good for 14 days).`
             )
           }
         >
-          {pending ? "Sending…" : waiting ? "Resend Invite" : "Invite To Team App"}
+          {pending ? "Sending…" : status === "Active" ? "Send Password Reset" : waiting ? "Resend Invite" : "Invite To Team App"}
         </button>
       ) : null}
+      {!staff.email && !linked && <span style={{ fontSize: 11, color: "var(--muted)" }}>Add an email to invite to the team app</span>}
       {linked && (
         <button
           type="button"
