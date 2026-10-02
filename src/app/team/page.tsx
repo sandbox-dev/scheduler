@@ -74,6 +74,16 @@ function TimeStat({ label, value }: { label: string; value: string }) {
 // inner label/value pair, just without that box's background tint (this
 // section already has its own "Day Briefing" heading, so a tint per fact
 // would be one visual weight too many).
+// Notes as bullets: each line, and each sentence within a line.
+function noteBullets(text: string | null | undefined): string[] {
+  return (text ?? "")
+    .split(/\n+/)
+    // Not after a title or short form — "Ms. Lee" stays one bullet.
+    .flatMap((line) => line.split(/(?<!\b(?:Mr|Mrs|Ms|Dr|St|Rm|No|Jr|Sr|Ave|Mt)\.)(?<=[.!?])\s+(?=[A-Z0-9"“(])/))
+    .map((t) => t.replace(/^[-•*·]\s*/, "").trim())
+    .filter(Boolean);
+}
+
 function BriefingFact({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ marginTop: 8 }}>
@@ -198,8 +208,23 @@ function DayBriefingSection({
         {briefing?.parking_notes && <BriefingFact label="Parking Notes" value={briefing.parking_notes} />}
         {briefing?.dress_code_note && <BriefingFact label="Dress Code" value={briefing.dress_code_note} />}
         {briefing?.additional_gear_notes && <BriefingFact label="Additional Gear" value={briefing.additional_gear_notes} />}
-        {briefing?.notes && <BriefingFact label="Notes" value={briefing.notes} />}
-        {briefing?.school_notes && <BriefingFact label="From The School" value={briefing.school_notes} />}
+        {/* Our Notes, one bullet per line or sentence (Adi, 2026-10-02: a
+            paragraph was hard to read). The school's own instructions aren't
+            shown to staff — "if it's pertinent we will put it in notes." */}
+        {(() => {
+          const items = noteBullets(briefing?.notes);
+          if (items.length === 0) return null;
+          return (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Notes</div>
+              <ul style={{ margin: "2px 0 0", paddingLeft: 20, fontSize: 16, color: "var(--ink)", lineHeight: 1.45 }}>
+                {items.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        })()}
         {briefing?.wifi_network && (
           <BriefingFact
             label="Wifi"
