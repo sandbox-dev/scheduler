@@ -179,7 +179,16 @@ function DayBriefingSection({
           </div>
         )}
         {briefing?.individual_photo_location && (
-          <BriefingFact label="Individual Photo Location" value={briefing.individual_photo_location} />
+          <BriefingFact
+            label="Individual Photo Location"
+            value={briefing.individual_location_notes ? `${briefing.individual_photo_location} — ${briefing.individual_location_notes}` : briefing.individual_photo_location}
+          />
+        )}
+        {briefing?.group_photo_location && (
+          <BriefingFact
+            label="Group Photo Location"
+            value={briefing.group_location_notes ? `${briefing.group_photo_location} — ${briefing.group_location_notes}` : briefing.group_photo_location}
+          />
         )}
         {briefing?.backdrop && <BriefingFact label="Backdrop" value={briefing.backdrop} />}
         {/* School-wide (tb_schools.location_notes, set on School Details).

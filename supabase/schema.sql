@@ -1609,6 +1609,8 @@ grant execute on function staff_portal_briefing_for_days(uuid[]) to authenticate
 drop function if exists staff_portal_briefing_for_days(uuid[]);
 -- Return columns changed again (school_notes added, 2026-09-28): drop first.
 drop function if exists staff_portal_briefing_for_days(uuid[]);
+-- Return columns changed again (location notes, 2026-10-02): drop first.
+drop function if exists staff_portal_briefing_for_days(uuid[]);
 create or replace function staff_portal_briefing_for_days(p_picture_day_ids uuid[])
 returns table(
   picture_day_id uuid,
@@ -1630,7 +1632,11 @@ returns table(
   day_of_contact_phone text,
   -- The school's own answer to "Anything we should know about your school?"
   -- (tb_jobs.stipulations_notes), shown as From The School. 2026-09-28.
-  school_notes text
+  school_notes text,
+  -- Where things happen + our notes on it (2026-10-02).
+  individual_location_notes text,
+  group_photo_location text,
+  group_location_notes text
 )
 language plpgsql
 security definer
@@ -1660,6 +1666,10 @@ begin
       tj.day_of_contact_phone,
       tj.stipulations_notes,
       tj.school_notes_for_staff,
+      tj.individual_location_notes,
+      tj.group_photo_location,
+      tj.group_location_notes,
+      tj.photo_type,
       tj.school_id,
       tj.pixifi_custom_fields as job_custom_fields,
       ts.pixifi_custom_fields as school_custom_fields,
@@ -1704,7 +1714,10 @@ begin
     nullif(trim(b.day_of_contact_name), ''),
     nullif(trim(b.day_of_contact_phone), ''),
     -- Adi's trimmed staff copy wins once she's edited it (2026-09-28).
-    nullif(trim(coalesce(b.school_notes_for_staff, b.stipulations_notes)), '')
+    nullif(trim(coalesce(b.school_notes_for_staff, b.stipulations_notes)), ''),
+    nullif(trim(b.individual_location_notes), ''),
+    case when b.photo_type = 'group' then nullif(trim(b.group_photo_location), '') end,
+    case when b.photo_type = 'group' then nullif(trim(b.group_location_notes), '') end
   from base b;
 end;
 $$;

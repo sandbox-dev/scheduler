@@ -416,6 +416,11 @@ export type StaffPortalBriefingFields = {
   day_of_contact_phone?: string | null;
   // The school's own "Anything we should know about your school?" answer.
   school_notes?: string | null;
+  // 2026-10-02: notes under the individual location, and the group photo
+  // location + its notes (group photo days only).
+  individual_location_notes?: string | null;
+  group_photo_location?: string | null;
+  group_location_notes?: string | null;
 };
 
 // A custom field Adi added with no value filled in yet shouldn't clutter
