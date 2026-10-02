@@ -1,5 +1,6 @@
 import "server-only";
 import { isGroupPhotoSlot } from "./scheduling";
+import { briefingRowToFields } from "./staffPortal";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Availability,
@@ -502,23 +503,7 @@ export async function getStaffPortalBriefing(
           reference_photos_url: string | null;
           setup_photos_url: string | null;
         }[]
-      ).map((r) => [
-        r.picture_day_id,
-        {
-          backdrop: r.backdrop,
-          wifi_network: r.wifi_network,
-          wifi_password: r.wifi_password,
-          notes: r.notes,
-          individual_photo_location: r.individual_photo_location,
-          dress_code_note: r.dress_code_note,
-          additional_gear_notes: r.additional_gear_notes,
-          parking_notes: r.parking_notes,
-          custom_fields: r.custom_fields ?? [],
-          location_notes: r.location_notes,
-          reference_photos_url: r.reference_photos_url,
-          setup_photos_url: r.setup_photos_url,
-        },
-      ])
+      ).map(briefingRowToFields)
     );
   } catch (err) {
     console.error("getStaffPortalBriefing failed — hiding the briefing", err);
