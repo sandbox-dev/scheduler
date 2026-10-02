@@ -212,7 +212,8 @@ export async function getTimelineBuilderJobIds(schedulerJobIds: string[]): Promi
 // staff-scoped RLS policy on `staff` already lets a login read every
 // column of its OWN row (see "staff-scoped read own row" in
 // supabase/schema.sql), same as it already can for e.g. `pin`.
-export type StaffPortalAccount = { id: string; name: string; calendar_token: string };
+// share_phone: null = not asked yet (the team app asks once).
+export type StaffPortalAccount = { id: string; name: string; calendar_token: string; share_phone?: boolean | null };
 
 // The logged-in staff-scoped user's own staff row, or null if this login
 // isn't linked to one (shouldn't normally happen — the proxy only routes a
@@ -227,11 +228,11 @@ export async function getMyStaffAccount(): Promise<StaffPortalAccount | null> {
 
   const { data, error } = await supabase
     .from("staff")
-    .select("id, name, calendar_token")
+    .select("*")
     .eq("auth_user_id", user.id)
     .maybeSingle();
   if (error) throw error;
-  return data as StaffPortalAccount | null;
+  return data ? { id: data.id, name: data.name, calendar_token: data.calendar_token, share_phone: data.share_phone ?? null } : null;
 }
 
 export type StaffPortalAssignment = {
@@ -452,9 +453,9 @@ export async function getStaffPortalCrew(
     });
     if (error) throw error;
     const byDay = new Map<string, StaffPortalCrewMember[]>();
-    for (const row of data as { picture_day_id: string; staff_name: string; role: Role; is_group_photographer?: boolean }[]) {
+    for (const row of data as { picture_day_id: string; staff_name: string; role: Role; is_group_photographer?: boolean; phone?: string | null }[]) {
       const list = byDay.get(row.picture_day_id) ?? [];
-      list.push({ name: row.staff_name, role: row.role, is_group_photographer: !!row.is_group_photographer });
+      list.push({ name: row.staff_name, role: row.role, is_group_photographer: !!row.is_group_photographer, phone: row.phone ?? null });
       byDay.set(row.picture_day_id, list);
     }
     for (const [day, list] of byDay) byDay.set(day, sortStaffPortalCrew(list));

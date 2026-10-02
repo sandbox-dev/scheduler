@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarPlus, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, NotebookPen } from "lucide-react";
+import { CalendarPlus, CheckCircle2, MessageSquare, Phone, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, NotebookPen } from "lucide-react";
 import { Card, RoleTag } from "@/components/ui";
 import { CalendarSubscribeLink } from "./CalendarSubscribeLink";
+import { SharePhonePrompt } from "./SharePhonePrompt";
 import {
   getMyAssignments,
   getMyStaffAccount,
@@ -123,6 +124,17 @@ function DayBriefingSection({
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16 }}>
                 <RoleTag role={member.role} label={member.is_group_photographer ? "Group Photographer" : undefined} />
                 <span>{member.name}</span>
+                {/* Only for teammates who agreed to share their number. */}
+                {member.phone && (
+                  <span style={{ display: "inline-flex", gap: 6, marginLeft: "auto" }}>
+                    <a href={`tel:${member.phone.replace(/[^0-9+]/g, "")}`} className="btn-secondary" style={{ padding: "4px 9px", fontSize: 13 }} aria-label={`Call ${member.name}`}>
+                      <Phone size={13} /> Call
+                    </a>
+                    <a href={`sms:${member.phone.replace(/[^0-9+]/g, "")}`} className="btn-secondary" style={{ padding: "4px 9px", fontSize: 13 }} aria-label={`Text ${member.name}`}>
+                      <MessageSquare size={13} /> Text
+                    </a>
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -440,15 +452,22 @@ export default async function TeamPage({
             <Image src="/logo.png" alt="Sandbox Photographers" width={84} height={34} style={{ objectFit: "contain" }} priority />
             <div className="display" style={{ fontSize: 20, fontWeight: 700 }}>Hi, {firstName}</div>
           </div>
-          <form action={logout}>
-            <button className="btn-secondary" type="submit">
-              <LogOut size={13} /> Sign Out
-            </button>
-          </form>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* Always one tap away (Adi, 2026-10-02). */}
+            <a href="tel:+19252225195" className="btn-primary" style={{ whiteSpace: "nowrap" }}>
+              <Phone size={13} /> Call Studio
+            </a>
+            <form action={logout}>
+              <button className="btn-secondary" type="submit">
+                <LogOut size={13} /> Sign Out
+              </button>
+            </form>
+          </div>
         </div>
       </div>
 
       <div style={{ padding: 16, maxWidth: 460, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12 }}>
+        {account.share_phone == null && <SharePhonePrompt current={null} />}
         <div className="display" style={{ fontSize: 17, fontWeight: 700, textAlign: "center" }}>Your Booked Jobs</div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
@@ -540,16 +559,35 @@ export default async function TeamPage({
                   </summary>
 
                   <div style={{ padding: "0 22px 20px" }}>
+                    {/* Google Maps or Apple Maps — staff asked for the choice
+                        (2026-10-02). */}
                     {a.school?.address && (
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.school.address)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 2, fontSize: 16, color: "var(--navy)", textDecoration: "underline" }}
-                      >
-                        <MapPin size={13} style={{ marginTop: 1, flexShrink: 0 }} />
-                        {a.school.address}
-                      </a>
+                      <div style={{ marginTop: 2 }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 16, color: "var(--ink)" }}>
+                          <MapPin size={13} style={{ marginTop: 4, flexShrink: 0 }} />
+                          {a.school.address}
+                        </div>
+                        <div style={{ display: "flex", gap: 8, marginTop: 8, paddingLeft: 19 }}>
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.school.address)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-secondary"
+                            style={{ padding: "5px 11px", fontSize: 13.5 }}
+                          >
+                            Google Maps
+                          </a>
+                          <a
+                            href={`https://maps.apple.com/?q=${encodeURIComponent(a.school.address)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-secondary"
+                            style={{ padding: "5px 11px", fontSize: 13.5 }}
+                          >
+                            Apple Maps
+                          </a>
+                        </div>
+                      </div>
                     )}
 
                     <div style={{ ...sectionBoxStyle, marginTop: 14 }}>
@@ -597,6 +635,8 @@ export default async function TeamPage({
             );
           })
         )}
+        {/* Change the phone-sharing answer any time. */}
+        {account.share_phone != null && <SharePhonePrompt current={account.share_phone} />}
       </div>
     </div>
   );

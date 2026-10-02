@@ -377,7 +377,8 @@ export function computeJobDayPosition(thisDate: string, allDatesForJob: string[]
 // supabase/schema.sql for where these come from and the security shape
 // that guards them.
 
-export type StaffPortalCrewMember = { name: string; role: Role; is_group_photographer?: boolean };
+// phone: only when that person agreed to share it.
+export type StaffPortalCrewMember = { name: string; role: Role; is_group_photographer?: boolean; phone?: string | null };
 
 // One row of Adi's free-form "extra facts" list — same {id, label, value}
 // shape as timeline-builder's own CustomField (src/lib/types.ts there),
