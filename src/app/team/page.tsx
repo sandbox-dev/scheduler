@@ -1,9 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
-import { CalendarPlus, CheckCircle2, MessageSquare, Phone, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, LogOut, MapPin, NotebookPen } from "lucide-react";
+import { CalendarPlus, CheckCircle2, MessageSquare, Phone, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, MapPin, NotebookPen } from "lucide-react";
 import { Card, RoleTag } from "@/components/ui";
 import { CalendarSubscribeLink } from "./CalendarSubscribeLink";
 import { SharePhonePrompt } from "./SharePhonePrompt";
+import { TeamTopBar } from "./TeamTopBar";
 import {
   getMyAssignments,
   getMyStaffAccount,
@@ -446,25 +446,7 @@ export default async function TeamPage({
 
   return (
     <div style={{ minHeight: "100dvh" }}>
-      <div className="top-bar no-print">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Image src="/logo.png" alt="Sandbox Photographers" width={84} height={34} style={{ objectFit: "contain" }} priority />
-            <div className="display" style={{ fontSize: 20, fontWeight: 700 }}>Hi, {firstName}</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {/* Always one tap away (Adi, 2026-10-02). */}
-            <a href="tel:+19252225195" className="btn-primary" style={{ whiteSpace: "nowrap" }}>
-              <Phone size={13} /> Call Studio
-            </a>
-            <form action={logout}>
-              <button className="btn-secondary" type="submit">
-                <LogOut size={13} /> Sign Out
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
+      <TeamTopBar firstName={firstName} />
 
       <div style={{ padding: 16, maxWidth: 460, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12 }}>
         {account.share_phone == null && <SharePhonePrompt current={null} />}
@@ -635,8 +617,6 @@ export default async function TeamPage({
             );
           })
         )}
-        {/* Change the phone-sharing answer any time. */}
-        {account.share_phone != null && <SharePhonePrompt current={account.share_phone} />}
       </div>
     </div>
   );

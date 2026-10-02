@@ -34,18 +34,35 @@ export function SharePhonePrompt({ current }: { current: boolean | null }) {
       </Card>
     );
   }
+  // Answered just now — a short note; it lives in Settings from here on.
+  return <div style={{ fontSize: 13.5, color: "var(--good)", fontWeight: 600, textAlign: "center" }}>✓ Saved. You can change this anytime in Settings (☰).</div>;
+}
+
+// The Settings page version: the same question, with the current answer
+// picked.
+export function SharePhoneSetting({ current }: { current: boolean | null }) {
+  const [value, setValue] = useState(current);
+  const [pending, start] = useTransition();
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const choose = (share: boolean) =>
+    start(async () => {
+      try {
+        await setSharePhone(share);
+        setValue(share);
+        setNote({ ok: true, text: share ? "✓ Your number is shared with your team." : "✓ Your number isn't shared." });
+      } catch (e) {
+        setNote({ ok: false, text: e instanceof Error ? e.message : "Couldn't save that — please try again." });
+      }
+    });
   return (
-    <div style={{ fontSize: 13.5, color: "var(--muted)", textAlign: "center" }}>
-      {value ? "Your phone number is shared with your team." : "Your phone number isn't shared with your team."}{" "}
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => choose(!value)}
-        style={{ background: "none", border: "none", padding: 0, color: "var(--navy)", textDecoration: "underline", cursor: "pointer", fontSize: 13.5 }}
-      >
-        {value ? "Stop sharing" : "Share it"}
-      </button>
-      {error && <div style={{ color: "var(--bad)" }}>{error}</div>}
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>Phone Number</div>
+      <div style={{ fontSize: 16, marginBottom: 10 }}>{SHARE_PHONE_QUESTION}</div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button className={value === true ? "btn-primary" : "btn-secondary"} disabled={pending} onClick={() => choose(true)} style={{ flex: 1, justifyContent: "center" }}>Yes, Share It</button>
+        <button className={value === false ? "btn-primary" : "btn-secondary"} disabled={pending} onClick={() => choose(false)} style={{ flex: 1, justifyContent: "center" }}>No Thanks</button>
+      </div>
+      {note && <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 8, color: note.ok ? "var(--good)" : "var(--bad)" }}>{note.text}</div>}
     </div>
   );
 }
