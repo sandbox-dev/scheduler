@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { Card } from "@/components/ui";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { SetPasswordForm } from "./SetPasswordForm";
@@ -13,6 +14,11 @@ export default async function TeamWelcomePage({ params }: { params: Promise<{ to
     ? await createServiceRoleClient().from("staff").select("name, team_invite_expires_at").eq("team_invite_token", token).maybeSingle()
     : { data: null };
   const ok = !!staff?.team_invite_expires_at && new Date(staff.team_invite_expires_at) > new Date();
+  // Already used (or expired): go to the team app — signed in, they land on
+  // their jobs; if not, the sign-in page. Someone who saved this set-up page
+  // to their home screen (iPhones save the page that's open) used to get a
+  // dead end here every time they opened it (Cyrene, 2026-10-02).
+  if (!ok) redirect("/team");
   return (
     <div style={{ padding: 16, maxWidth: 420, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "center", margin: "16px 0" }}>
