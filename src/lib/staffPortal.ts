@@ -478,3 +478,10 @@ export function staffPortalArrivalRange(fields: StaffPortalTimelineFields): { st
   const start = arrivalMinutes(fields);
   return { startMinutes: start, endMinutes: start + 60 };
 }
+
+// Every column the database sends, not a hand-picked list: a list here
+// silently dropped the day-of contact, From The School and the location notes
+// for days after they were added (2026-10-02). Tested in briefingRow.test.ts.
+export function briefingRowToFields({ picture_day_id, ...r }: { picture_day_id: string; custom_fields?: unknown } & Record<string, unknown>): [string, StaffPortalBriefingFields] {
+  return [picture_day_id, { ...r, custom_fields: (r.custom_fields as StaffPortalBriefingFields["custom_fields"]) ?? [] } as unknown as StaffPortalBriefingFields];
+}
