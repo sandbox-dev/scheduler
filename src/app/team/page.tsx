@@ -74,23 +74,33 @@ function TimeStat({ label, value }: { label: string; value: string }) {
 // inner label/value pair, just without that box's background tint (this
 // section already has its own "Day Briefing" heading, so a tint per fact
 // would be one visual weight too many).
-// Notes as bullets: each line, and each sentence within a line.
+// One bullet per line typed (Adi, 2026-10-02: "each enter should be a
+// bullet point"). A leading "-" or "•" someone typed themselves is dropped.
 function noteBullets(text: string | null | undefined): string[] {
   return (text ?? "")
-    .split(/\n+/)
-    // Not after a title or short form — "Ms. Lee" stays one bullet.
-    .flatMap((line) => line.split(/(?<!\b(?:Mr|Mrs|Ms|Dr|St|Rm|No|Jr|Sr|Ave|Mt)\.)(?<=[.!?])\s+(?=[A-Z0-9"“(])/))
+    .split(/\r?\n+/)
     .map((t) => t.replace(/^[-•*·]\s*/, "").trim())
     .filter(Boolean);
 }
 
-function BriefingFact({ label, value }: { label: string; value: string }) {
+// Lines under a fact, one per line typed, never joined with dashes
+// (Adi, 2026-10-02: "em dashes which are messy and hard to read"). `bullets`
+// lists each line typed as a bullet.
+function BriefingFact({ label, value, bullets }: { label: string; value?: React.ReactNode; bullets?: string | null }) {
+  const items = noteBullets(bullets);
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-        {label}
+        {label.replace(/:\s*$/, "")}
       </div>
-      <div style={{ fontSize: 16, color: "var(--ink)", marginTop: 1 }}>{value}</div>
+      {value != null && value !== "" && <div style={{ fontSize: 16, color: "var(--ink)", marginTop: 1 }}>{value}</div>}
+      {items.length > 0 && (
+        <ul style={{ margin: "2px 0 0", paddingLeft: 22, listStyleType: "disc", fontSize: 16, color: "var(--ink)", lineHeight: 1.45 }}>
+          {items.map((t, i) => (
+            <li key={i}>{t}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -177,27 +187,28 @@ function DayBriefingSection({
         {(briefing?.day_of_contact_name || briefing?.day_of_contact_phone) && (
           <div style={{ marginTop: 8 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Day-Of Contact</div>
-            <div style={{ fontSize: 16, color: "var(--ink)", marginTop: 1 }}>
-              {briefing.day_of_contact_name}
-              {briefing.day_of_contact_name && briefing.day_of_contact_phone ? " — " : ""}
-              {briefing.day_of_contact_phone && (
+            {briefing.day_of_contact_name && <div style={{ fontSize: 16, color: "var(--ink)", marginTop: 1 }}>{briefing.day_of_contact_name}</div>}
+            {briefing.day_of_contact_phone && (
+              <div style={{ fontSize: 16, marginTop: 1 }}>
                 <a href={`tel:${briefing.day_of_contact_phone.replace(/[^0-9+]/g, "")}`} style={{ color: "var(--navy)", fontWeight: 700 }}>
                   {briefing.day_of_contact_phone}
                 </a>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
         {briefing?.individual_photo_location && (
           <BriefingFact
             label="Individual Photo Location"
-            value={briefing.individual_location_notes ? `${briefing.individual_photo_location} — ${briefing.individual_location_notes}` : briefing.individual_photo_location}
+            value={briefing.individual_photo_location}
+            bullets={briefing.individual_location_notes}
           />
         )}
         {briefing?.group_photo_location && (
           <BriefingFact
             label="Group Photo Location"
-            value={briefing.group_location_notes ? `${briefing.group_photo_location} — ${briefing.group_location_notes}` : briefing.group_photo_location}
+            value={briefing.group_photo_location}
+            bullets={briefing.group_location_notes}
           />
         )}
         {briefing?.backdrop && <BriefingFact label="Backdrop" value={briefing.backdrop} />}
@@ -208,27 +219,19 @@ function DayBriefingSection({
         {briefing?.parking_notes && <BriefingFact label="Parking Notes" value={briefing.parking_notes} />}
         {briefing?.dress_code_note && <BriefingFact label="Dress Code" value={briefing.dress_code_note} />}
         {briefing?.additional_gear_notes && <BriefingFact label="Additional Gear" value={briefing.additional_gear_notes} />}
-        {/* Our Notes, one bullet per line or sentence (Adi, 2026-10-02: a
-            paragraph was hard to read). The school's own instructions aren't
-            shown to staff — "if it's pertinent we will put it in notes." */}
-        {(() => {
-          const items = noteBullets(briefing?.notes);
-          if (items.length === 0) return null;
-          return (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Notes</div>
-              <ul style={{ margin: "2px 0 0", paddingLeft: 20, fontSize: 16, color: "var(--ink)", lineHeight: 1.45 }}>
-                {items.map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-              </ul>
-            </div>
-          );
-        })()}
+        {/* Our Notes, one bullet per line (Adi, 2026-10-02). The school's
+            own instructions aren't shown to staff — "if it's pertinent we
+            will put it in notes." */}
+        {noteBullets(briefing?.notes).length > 0 && <BriefingFact label="Notes" bullets={briefing?.notes} />}
         {briefing?.wifi_network && (
           <BriefingFact
             label="Wifi"
-            value={briefing.wifi_password ? `${briefing.wifi_network} — ${briefing.wifi_password}` : briefing.wifi_network}
+            value={
+              <>
+                <div>{briefing.wifi_network}</div>
+                {briefing.wifi_password && <div>Password: {briefing.wifi_password}</div>}
+              </>
+            }
           />
         )}
         {briefing && visibleStaffPortalCustomFields(briefing.custom_fields).map((f) => (
