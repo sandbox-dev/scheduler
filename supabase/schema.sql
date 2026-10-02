@@ -1372,7 +1372,10 @@ returns table(
   -- The day's dedicated group photographer: the Photographer slot at index
   -- = setups on a has_group_photo day (isGroupPhotoSlot in scheduling.ts).
   -- Added 2026-09-28.
-  is_group_photographer boolean
+  is_group_photographer boolean,
+  -- Only when that person said yes to sharing it (staff.share_phone),
+  -- so teammates can call/text from the app. 2026-10-02.
+  phone text
 )
 language plpgsql
 security definer
@@ -1391,7 +1394,8 @@ begin
     sa.picture_day_id,
     s.name,
     sa.role,
-    (sa.role = 'Photographer' and pd.has_group_photo and sa.slot_index = pd.setups)
+    (sa.role = 'Photographer' and pd.has_group_photo and sa.slot_index = pd.setups),
+    case when s.share_phone is true then nullif(trim(s.phone), '') else null end
   from schedule_assignments sa
   join staff s on s.id = sa.staff_id
   join picture_days pd on pd.id = sa.picture_day_id
@@ -2058,3 +2062,23 @@ grant execute on function staff_portal_shoot_notes_done(uuid[]) to authenticated
 alter table staff add column if not exists team_invite_token uuid unique;
 alter table staff add column if not exists team_invite_expires_at timestamptz;
 alter table staff add column if not exists team_invited_at timestamptz;
+
+
+-- ---------- Team phone sharing (2026-10-02) ----------
+-- Staff choose whether teammates can see their number (to call/text from the
+-- team app). null = not asked yet. Set by the staff member themselves
+-- through staff_set_share_phone (staff can't update their own row directly).
+alter table staff add column if not exists share_phone boolean;
+
+create or replace function staff_set_share_phone(p_share boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update staff set share_phone = p_share where auth_user_id = auth.uid();
+end;
+$$;
+revoke execute on function staff_set_share_phone(boolean) from public, anon;
+grant execute on function staff_set_share_phone(boolean) to authenticated;
