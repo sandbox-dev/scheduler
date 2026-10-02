@@ -55,7 +55,7 @@ export function TeamTopBar({ firstName }: { firstName: string }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 16 }}>
         <Link href="/team" style={{ display: "flex", alignItems: "center", gap: 8, color: "inherit", textDecoration: "none", minWidth: 0 }}>
           <Image src="/logo.png" alt="Sandbox Photographers" width={72} height={29} style={{ objectFit: "contain", flexShrink: 0 }} priority />
-          <div className="display" style={{ fontSize: 18, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Hi, {firstName}</div>
+          <div className="display" style={{ fontSize: 18, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Hi {firstName}!</div>
         </Link>
         <div ref={ref} style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ position: "relative" }}>
