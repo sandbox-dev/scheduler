@@ -12,12 +12,20 @@ export const GEAR_TAG_COLORS = {
   // backdrops, gray and ivy wall").
   ivy: { bg: "#3F7A47", border: "#2F5E36", color: "#FFFFFF" },
   gray: { bg: "#7D8187", border: "#5F6368", color: "#FFFFFF" },
+  // Added 2026-10-03 with the backdrop dropdown — Natural Setting tan,
+  // Blue Skies light blue (Adi).
+  natural: { bg: "#A47A4E", border: "#85613B", color: "#FFFFFF" },
+  sky: { bg: "#BFE0F5", border: "#7DBBE3", color: "#154E75" },
 } as const;
 
 export type GearTone = keyof typeof GEAR_TAG_COLORS;
 
-export function backdropTone(name: string): "ivy" | "gray" | "plain" {
+// Backdrops are picked from a list in The Sandbox now (Gray, Natural
+// Setting, Ivy Wall, Blue Skies — src/lib/backdrops.ts there).
+export function backdropTone(name: string): "ivy" | "gray" | "natural" | "sky" | "plain" {
   if (/ivy|green/i.test(name)) return "ivy";
   if (/gr[ae]y/i.test(name)) return "gray";
+  if (/natural/i.test(name)) return "natural";
+  if (/blue|sky/i.test(name)) return "sky";
   return "plain";
 }
