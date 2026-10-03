@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GEAR_TAG_COLORS, backdropTone, type GearTone } from "@/lib/gearTags";
 import { CalendarPlus, CheckCircle2, MessageSquare, Phone, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, Images, ListOrdered, MapPin, NotebookPen } from "lucide-react";
 import { Card, RoleTag } from "@/components/ui";
 import { CalendarSubscribeLink } from "./CalendarSubscribeLink";
@@ -56,6 +57,28 @@ function formatDayLabel(dateStr: string, todayIso: string) {
   return dateStr === todayIso ? `Today · ${label}` : label;
 }
 
+// A pill in the same colors as the weekly print sheet (Adi, 2026-10-03).
+function Pill({ tone, children }: { tone: GearTone; children: React.ReactNode }) {
+  const c = GEAR_TAG_COLORS[tone];
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        fontSize: 14,
+        fontWeight: 700,
+        padding: "2px 11px",
+        borderRadius: 999,
+        border: `1px solid ${c.border}`,
+        background: c.bg,
+        color: c.color,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 function TimeStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -83,17 +106,22 @@ function noteBullets(text: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+// Space between sections in Details (Adi, 2026-10-03: "increase the space a
+// little between sections").
+const FACT_GAP = 14;
+
 // Lines under a fact, one per line typed, never joined with dashes
 // (Adi, 2026-10-02: "em dashes which are messy and hard to read"). `bullets`
 // lists each line typed as a bullet.
+// Answers bold, notes regular, so the facts stand out (Adi, 2026-10-03).
 function BriefingFact({ label, value, bullets }: { label: string; value?: React.ReactNode; bullets?: string | null }) {
   const items = noteBullets(bullets);
   return (
-    <div style={{ marginTop: 8 }}>
+    <div style={{ marginTop: FACT_GAP }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
         {label.replace(/:\s*$/, "")}
       </div>
-      {value != null && value !== "" && <div style={{ fontSize: 16, color: "var(--ink)", marginTop: 1 }}>{value}</div>}
+      {value != null && value !== "" && <div style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", marginTop: 1 }}>{value}</div>}
       {items.length > 0 && (
         <ul style={{ margin: "2px 0 0", paddingLeft: 22, listStyleType: "disc", fontSize: 16, color: "var(--ink)", lineHeight: 1.45 }}>
           {items.map((t, i) => (
@@ -178,16 +206,23 @@ function DayBriefingSection({
           <ClipboardList size={12} /> Details
         </div>
 
-        <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+        {/* Indoor/Outdoor as a pill to the right of Setups, Babies under School
+            Type (Adi, 2026-10-03, from the mockup). */}
+        <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
           <TimeStat label="School Type" value={staffPortalSchoolTypeLabel(job)} />
           <TimeStat label="Setups" value={String(pictureDay.setups)} />
-          <TimeStat label="Location" value={pictureDay.is_outdoor ? "Outdoor" : "Indoor"} />
+          <Pill tone={pictureDay.is_outdoor ? "outdoor" : "indoor"}>{pictureDay.is_outdoor ? "Outdoor" : "Indoor"}</Pill>
         </div>
+        {pictureDay.is_babies && (
+          <div style={{ marginTop: FACT_GAP }}>
+            <Pill tone="babies">Babies</Pill>
+          </div>
+        )}
 
         {(briefing?.day_of_contact_name || briefing?.day_of_contact_phone) && (
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: FACT_GAP }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Day-Of Contact</div>
-            {briefing.day_of_contact_name && <div style={{ fontSize: 16, color: "var(--ink)", marginTop: 1 }}>{briefing.day_of_contact_name}</div>}
+            {briefing.day_of_contact_name && <div style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", marginTop: 1 }}>{briefing.day_of_contact_name}</div>}
             {briefing.day_of_contact_phone && (
               <div style={{ fontSize: 16, marginTop: 1 }}>
                 <a href={`tel:${briefing.day_of_contact_phone.replace(/[^0-9+]/g, "")}`} style={{ color: "var(--navy)", fontWeight: 700 }}>
@@ -211,12 +246,12 @@ function DayBriefingSection({
             bullets={briefing.group_location_notes}
           />
         )}
-        {briefing?.backdrop && <BriefingFact label="Backdrop" value={briefing.backdrop} />}
+        {briefing?.backdrop && <BriefingFact label="Backdrop" value={<span style={{ display: "inline-block", marginTop: 3 }}><Pill tone={backdropTone(briefing.backdrop)}>{briefing.backdrop}</Pill></span>} />}
         {/* School-wide (tb_schools.location_notes, set on School Details).
             Moved here beside Parking Notes 2026-09-28 — Adi: "so we know
             its there" (it used to sit alone under the address). */}
-        {briefing?.location_notes && <BriefingFact label="Location Notes" value={briefing.location_notes} />}
-        {briefing?.parking_notes && <BriefingFact label="Parking Notes" value={briefing.parking_notes} />}
+        {briefing?.location_notes && <BriefingFact label="Location Notes" bullets={briefing.location_notes} />}
+        {briefing?.parking_notes && <BriefingFact label="Parking Notes" bullets={briefing.parking_notes} />}
         {briefing?.dress_code_note && <BriefingFact label="Dress Code" value={briefing.dress_code_note} />}
         {briefing?.additional_gear_notes && <BriefingFact label="Additional Gear" value={briefing.additional_gear_notes} />}
         {/* Our Notes, one bullet per line (Adi, 2026-10-02). The school's
